@@ -54,6 +54,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
+      - name: "Set up Go"
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
       - name: "Initialize CodeQL"
         uses: github/codeql-action/init@v4
         with:
@@ -68,12 +74,6 @@ jobs:
         uses: github/codeql-action/resolve-environment@v4
         with:
           language: "${{ matrix.language }}"
-
-      - name: "Set up Go"
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
 
       - name: "Build Commodore"
         run: |
