@@ -30,3 +30,11 @@ ij_shell_minify_program = false
 ij_shell_redirect_followed_by_space = false
 ij_shell_switch_cases_indented = true
 ij_shell_use_unix_line_separator = true
+
+
+[*.{md,mdx,yml,yaml,json,svg}]
+
+indent_style = space
+indent_size = 2
+tab_width = 2
+ij_continuation_indent_size = 2
