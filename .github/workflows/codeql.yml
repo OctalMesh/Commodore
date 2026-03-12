@@ -12,9 +12,6 @@ on:
 permissions:
   contents: read
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   # Check if the commit message contains [ql-skip] to avoid unnecessary runs
   check:
@@ -25,8 +22,7 @@ jobs:
     steps:
       - id: skip_check
         run: |
-          MSG="${{ github.event.pull_request.head.commit.message }}${{ github.event.head_commit.message }}"
-          if [[ "$MSG" == *"[ql-skip]"* ]]; then
+          if [[ "${{ github.event.head_commit.message }}" == *"[ql-skip]"* ]]; then
             echo "should_skip=true" >> $GITHUB_OUTPUT
           else
             echo "should_skip=false" >> $GITHUB_OUTPUT
@@ -53,12 +49,12 @@ jobs:
 
     steps:
       - name: "Checkout repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: "Set up Go"
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
