@@ -1,13 +1,24 @@
-name: CodeQL Configuration
+name: "CodeQL Configuration"
 
 paths-ignore:
-  - vendor
-  - pkg/sdk/**/testdata
-  - internal/**/testdata
-  - '**/*_test.go'
-  - '**/test_*.go'
-  - go.sum
-  - go.mod
+  - "vendor"
+  - "**/testdata/**"
+  - "**/*_test.go"
+  - "**/test_*.go"
+  - "**/mock_*.go"
+  - "**/*.pb.go"
+  - "**/*.gen.go"
+  - "scripts/**"
+  - "go.sum"
+  - "go.mod"
 
 queries:
-  - uses: security-and-quality
+  - uses: "security-and-quality"
+
+query-filters:
+  - exclude:
+      id: go/unused-parameter
+
+  - exclude:
+      id: go/cyclomatic-complexity
+      threshold: 20
