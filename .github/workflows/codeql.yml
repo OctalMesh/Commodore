@@ -19,6 +19,7 @@ permissions:
 jobs:
   # Check if the commit message contains [ql-skip] to avoid unnecessary runs
   check:
+    name: "Skip Check"
     runs-on: ubuntu-latest
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
@@ -57,12 +58,6 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: "Set up Go"
-        uses: actions/setup-go@v5
-        with:
-          go-version: "stable"
-          cache: true
-
       - name: "Initialize CodeQL"
         uses: github/codeql-action/init@v4
         with:
@@ -71,8 +66,22 @@ jobs:
           build-mode: "${{ matrix.build-mode }}"
           queries: "security-and-quality"
 
+      - name: "Setup proxy for registries"
+        uses: github/codeql-action/start-proxy@v4
+
+      - name: "Configure"
+        uses: github/codeql-action/resolve-environment@v4
+        with:
+          language: "${{ matrix.language }}"
+
+      - name: "Set up Go"
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache: true
+
       - name: "Autobuild"
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: "Perform CodeQL Analysis"
         uses: github/codeql-action/analyze@v4
