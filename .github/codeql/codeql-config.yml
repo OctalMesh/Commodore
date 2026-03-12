@@ -1,0 +1,13 @@
+name: CodeQL Configuration
+
+paths-ignore:
+  - vendor
+  - pkg/sdk/**/testdata
+  - internal/**/testdata
+  - '**/*_test.go'
+  - '**/test_*.go'
+  - go.sum
+  - go.mod
+
+queries:
+  - uses: security-and-quality
