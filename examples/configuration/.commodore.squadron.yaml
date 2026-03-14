@@ -1,0 +1,123 @@
+# DISCLAIMER: This is an example configuration file for a Commodore squadron.
+# It can be unlogically simple or complex cause it's just an example. The actual
+# structure and content of your squadron config will depend on your specific
+# project needs and organizational structure.
+
+# ============================================================================ #
+#                             Squadron Commander                               #
+# ============================================================================ #
+# Role: squadron | The recursive orchestrator node.                            #
+# Manages tactical groups and inter-unit synchronization.                      #
+# ============================================================================ #
+
+role:   squadron      # Defines the role of this config as a squadron commander
+id:     root-division # Unique identifier for this squadron (must be unique across the manifest)
+binary: custom        # Optional: Custom binary for this squadron to execute (defaults to 'commodore')
+
+# ============================================================================ #
+#                            Reactor Configuration                             #
+# ============================================================================ #
+# Defines the reactor provider and its configuration for live updates,         #
+# orchestration, and environment management across the squadron.               #
+# ============================================================================ #
+
+reactor:
+  provider: tilt           # Specifies Tilt as the reactor provider for live updates and orchestration
+  network:  commodore-mesh # Optional: Custom network for inter-unit communication
+  context: ./              # Optional: Build context for the reactor
+
+  # Optional: Define the reactor configuration, such as the path to the Tiltfile
+  # and any additional settings needed for the reactor to function properly.
+  blueprints:
+    - env:  dev             # Optional: Name of the environment this blueprint applies to
+      path: ./dev/Tiltfile  # Path to the configuration file
+
+    - env:  staging
+      path: ./staging/Tiltfile
+
+  # Optional: Define environment variables for the whole squadron, accessible to
+  # all units and sub-squadrons.
+  environments:
+    - name: dev               # Name of the environment
+      files:                  # Optional: Load environment variables from a file for this environment
+        - ./dev/.env
+      variables:              # Optional: Define environment variables specific to this environment
+        - LOG_LEVEL=DEBUG
+        - SOME_VAR=some_value
+
+    - name: staging
+      files:
+        - ./staging/.env
+      variables:
+        - LOG_LEVEL=INFO
+        - SOME_VAR=some_other_value
+
+# ============================================================================ #
+#                                Fleet Manifest                                #
+# ============================================================================ #
+# The Manifest defines the hierarchy. Every path leads to another config.      #
+# No explicit roles needed here—each subordinate declares itself.              #
+# ============================================================================ #
+
+manifest:
+  - id:   sqd-frontend       # Unique identifier for the subordinate squadron
+    path: ./modules/frontend # Points to a squadron directory (can also point to .yaml, without certain folder)
+
+    # Optional: Define tags for this squadron, which can be used for grouping
+    # and dependency management across the manifest.
+    tags:
+      - "frontend"
+      - "client"
+
+    # Optional: Define dependencies for this squadron, ensuring it starts after
+    # specified subordinates are healthy and running.
+    after:
+      - $tag-backend     # Wait for all units tagged with 'backend' to be healthy before starting this squadron
+      - svc-auth
+      - svc-notification
+
+    # Optional: Define a health check for this squadron
+    healthcheck:
+      test:     [ "curl", "-f", "http://localhost:3000/health" ] # Health check command for this squadron
+      interval: 30s                                              # Interval for running the health check
+      timeout:  5s                                               # Timeout for the health check command
+      retries:  3                                                # Number of retries before marking as unhealthy
+
+  - id:    app-desktop             # Unique identifier for the subordinate unit
+    path:  ./apps/desktop          # Points to a unit directory
+    tags:  [ "client" ]
+    after: [ "sqd-frontend" ]
+
+  - id:   svc-auth
+    path: ./services/auth
+    tags: [ "backend" ]
+    healthcheck:
+      test:     [ "curl", "-f", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout:  5s
+      retries:  3
+
+  - id:   svc-notification
+    path: ./services/notification
+    tags: [ "backend" ]
+    healthcheck:
+      test:     [ "curl", "-f", "http://localhost:8081/health" ]
+      interval: 30s
+      timeout:  5s
+      retries:  3
+
+  # Primitive execution unit
+  - id:   pmt-example
+    path: ./primitives/.commodore.example.yaml
+    tags: [ "primitives" ]
+
+# ============================================================================ #
+#                                  Maneuvers                                   #
+# ============================================================================ #
+# Maneuvers are the executable actions that this squadron performs.            #
+# ============================================================================ #
+
+maneuvers:
+  - call:        deploy                                                  # Unique identifier for this maneuver, used for invocation
+    description: "Deploy the entire squadron to the staging environment" # A brief description of what this maneuver does
+    action:      [ "bash", "./scripts/deploy.sh", "staging" ]            # The command to execute for this maneuver

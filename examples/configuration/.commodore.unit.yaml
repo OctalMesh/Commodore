@@ -1,0 +1,73 @@
+# DISCLAIMER: This is an example configuration file for a Commodore unit.
+# It defines the atomic execution logic for a single service or process.
+# Just like the squadron config, this is a template to be adapted.
+
+# ============================================================================ #
+#                               Unit Designation                               #
+# ============================================================================ #
+# Role: unit | The atomic execution unit of the Commodore fleet.               #
+# Handles the lifecycle, metadata, and identity of a single process.           #
+# ============================================================================ #
+
+role: unit     # Defines the role of this config as a standalone execution unit
+id:   svc-auth # Unique identifier (must match the ID in the Squadron manifest)
+
+# ============================================================================ #
+#                            Reactor Configuration                             #
+# ============================================================================ #
+# Defines how the unit is powered (virtualized/orchestrated).                  #
+# The reactor handles the environment, ports, and build context.               #
+# ============================================================================ #
+
+reactor:
+  provider: tilt # Specifies Tilt as the reactor provider [tilt | native]
+  context: ./    # Optional: Build context for the reactor
+
+  # Define the reactor configuration, such as the path to the Tiltfile and any
+  # additional settings needed for the reactor to function properly.
+  blueprints:
+    - env:  dev             # Optional: Name of the environment this blueprint applies to
+      path: ./dev/Tiltfile  # Path to the configuration file
+
+    - env:  staging
+      path: ./staging/Tiltfile
+
+    # Native provider blueprint example:
+    - env: dev
+      action: [ "docker", "build", "-t", "svc-auth:dev", "." ] # Command to build the service for the dev environment
+
+  # Optional: Define environment variables for the unit, accessible to the
+  # process and its sub-processes.
+  environments:
+    - name: dev               # Name of the environment
+      files:                  # Optional: Load environment variables from a file for this environment
+        - ./dev/.env
+      variables:              # Optional: Define environment variables specific to this environment
+        - LOG_LEVEL=DEBUG
+        - SOME_VAR=some_value
+
+    - name: staging
+      files:
+        - ./staging/.env
+      variables:
+        - LOG_LEVEL=INFO
+        - SOME_VAR=some_other_value
+
+# ============================================================================ #
+#                                  Maneuvers                                   #
+# ============================================================================ #
+# Maneuvers are the executable actions that this squadron performs.            #
+# ============================================================================ #
+
+maneuvers:
+  - call:        deploy                                          # Unique identifier for this maneuver, used for invocation
+    description: "Deploy the service to the staging environment" # A brief description of what this maneuver does
+    action:      [ "bash", "./scripts/deploy.sh", "staging" ]    # The command to execute for this maneuver
+
+  - call:        lint
+    description: "Run linters and static analysis on the codebase"
+    action:      [ "npm", "run", "lint" ]
+
+  - call:        test
+    description: "Execute unit tests with coverage reporting"
+    action:      [ "npm", "test", "--", "--coverage" ]
