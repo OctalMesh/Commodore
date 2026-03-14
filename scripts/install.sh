@@ -127,6 +127,34 @@ function _detect_shell_profile() {
     esac
 }
 
+# Resolves a Go build target for installation.
+# Priority:
+# 1) <src>/main.go (custom single-binary project)
+# 2) <src>/cmd/<name>/main.go (standard multi-command repository layout)
+#
+# Arguments:
+#   $1 - Source root/path from install command.
+#   $2 - Binary name.
+function _resolve_build_target() {
+    local src="$1"
+    local name="$2"
+
+    local cleaned_src="${src%/}"
+    [[ -z "${cleaned_src}" ]] && cleaned_src="."
+
+    if [[ -f "${cleaned_src}/main.go" ]]; then
+        echo "${cleaned_src}"
+        return 0
+    fi
+
+    if [[ -f "${cleaned_src}/cmd/${name}/main.go" ]]; then
+        echo "${cleaned_src}/cmd/${name}"
+        return 0
+    fi
+
+    return 1
+}
+
 # Build a Go binary and install it, creating symlinks/hardlinks for aliases.
 #
 # Arguments:
@@ -134,20 +162,44 @@ function _detect_shell_profile() {
 #   $2        Primary binary name   (e.g. octalweb).
 #   $3 ..$N   Optional alias names  (e.g. ow).
 function cmd_install() {
-    local src="${1:?Usage: commodore install <path> <name> [alias...]}"
-    local name="${2:?Usage: commodore install <path> <name> [alias...]}"
-    shift 2
+    local src
+    local name
+
+    case $# in
+        0)
+            src="./"
+            name="commodore"
+            ;;
+        1)
+            src="$1"
+            name="commodore"
+            shift 1
+            ;;
+        *)
+            src="${1:?Usage: commodore install <path> <name> [alias...]}"
+            name="${2:?Usage: commodore install <path> <name> [alias...]}"
+            shift 2
+            ;;
+    esac
 
     local bin_name
     bin_name="$(_bin_name "${name}")"
 
+    local build_target
+    if ! build_target="$(_resolve_build_target "${src}" "${name}")"; then
+        _print_fail "Build target not found for source '${src}' and binary '${name}'."
+        _print_info "Expected one of: ${src}/main.go or ${src}/cmd/${name}/main.go"
+        exit 1
+    fi
+
     _print_info  "Building     ${bin_name}"
     _print_info  "Source       ${src}"
+    _print_info  "Target       ${build_target}"
     _print_info  "Destination  ${INSTALL_DIR}"
     echo
 
     # Build
-    if ! go build -o "${bin_name}" "${src}/main.go"; then
+    if ! go build -o "${bin_name}" "${build_target}"; then
         _print_fail "Build failed: ${bin_name}"
         exit 1
     fi

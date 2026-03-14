@@ -25,8 +25,11 @@ readonly _COMMODORE_UNINSTALL_LOADED=1
 #   $1        Primary binary name to remove (e.g. octalweb).
 #   $2 ..$N   Optional alias names to remove (e.g. ow).
 function cmd_uninstall() {
-    local name="${1:?Usage: commodore uninstall <name> [alias...]}"
-    shift 1
+    local name="commodore"
+    if [[ $# -gt 0 ]]; then
+        name="$1"
+        shift 1
+    fi
 
     # Remove binary
     _remove_one "${name}" "binary"

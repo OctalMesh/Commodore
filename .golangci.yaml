@@ -48,9 +48,6 @@ linters-settings:
     # Only enable checks that find real bugs; leave style to revive.
     enabled-tags:
       - diagnostic
-    disabled-checks:
-      - hugeParam      # Model struct is intentionally large (BubbleTea requirement)
-      - rangeValCopy   # acceptable in our small domain structs
 
   revive:
     rules:
@@ -74,6 +71,14 @@ linters-settings:
     ignorePackageGlobs:
       - github.com/charmbracelet/bubbletea
       - github.com/OctalMesh/Commodore/internal/ui/tui
+      - github.com/OctalMesh/Commodore/internal/core/runtime/actions
+      - github.com/OctalMesh/Commodore/internal/core/runtime
+      - github.com/OctalMesh/Commodore/internal/core/domain
+      - github.com/OctalMesh/Commodore/internal/core/ports
+      - github.com/OctalMesh/Commodore/internal/adapters/cli/cobracli
+      - github.com/OctalMesh/Commodore/internal/adapters/reactor
+      - github.com/OctalMesh/Commodore/pkg/sdk
+      - github.com/spf13/cobra
 
   misspell:
     locale: US
@@ -83,14 +88,14 @@ issues:
     # Intentional pattern: git errors are already printed to stdout by git itself,
     # the cobra command returns nil to signal "handled gracefully, not an error".
     - path: internal/commands/modules\.go
-      linters: [nilerr]
+      linters: [ nilerr ]
 
     # Thin cobra handler layer - errors surface directly to the user via app.Run();
     # adding fmt.Errorf wrappers here would duplicate the message with no benefit.
     - path: internal/commands/
-      linters: [wrapcheck]
+      linters: [ wrapcheck ]
     - path: internal/roles/
-      linters: [wrapcheck]
+      linters: [ wrapcheck ]
 
   max-issues-per-linter: 0
   max-same-issues: 0

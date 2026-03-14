@@ -20,7 +20,7 @@ import (
 /*
 Finder is satisfied by any type that can locate a project / module root.
 Both the Foreman's RootFinder and every Brigadier's ModuleFinder satisfy it.
- */
+*/
 type Finder interface {
 	Find() (string, error)
 }
@@ -37,8 +37,8 @@ const (
 )
 
 const (
-	logViewHeight = 15    // visible lines in the log viewport
-	logMaxLines   = 500   // max buffered log lines (older ones dropped)
+	logViewHeight = 15  // visible lines in the log viewport
+	logMaxLines   = 500 // max buffered log lines (older ones dropped)
 	hintDuration  = 3 * time.Second
 	pageAll       = "all" // synthetic page that shows every service
 )
@@ -47,11 +47,11 @@ type checkDoneMsg struct {
 	root string
 	err  error
 }
-type tiltStartedMsg struct { cmd *exec.Cmd }
-type logLineMsg struct { line string }
-type logsDoneMsg struct {}
-type tiltExitMsg struct { err error }
-type tiltDownDoneMsg struct {}
+type tiltStartedMsg struct{ cmd *exec.Cmd }
+type logLineMsg struct{ line string }
+type logsDoneMsg struct{}
+type tiltExitMsg struct{ err error }
+type tiltDownDoneMsg struct{}
 type tickMsg time.Time
 
 // Model is the BubbleTea model shared by every OctalWeb CLI's up / down command.
@@ -124,7 +124,7 @@ func NewDownModel(brand string, f Finder, argv []string) Model {
 /*
 FinalErr returns the tilt process exit error.
 Returns nil when the stop was user-initiated (Ctrl+C) - that is not an error.
- */
+*/
 func (m Model) FinalErr() error {
 	if m.quitting {
 		return nil
@@ -325,7 +325,7 @@ doTiltDown runs `tilt down` to gracefully stop all managed services and
 containers, then kills the tilt-up process.
 The whole sequence is bounded by a 60 s timeout; after that the process is
 force-killed regardless.
- */
+*/
 func doTiltDown(root, tiltfile string, upCmd *exec.Cmd) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -449,7 +449,7 @@ func (m Model) tabBar() string {
 func (m Model) statusBar() string {
 	var runLabel string
 	if m.phase == phaseStopping {
-		runLabel = m.spinner.View() + "  " + StyleMuted.Render("stopping...")
+		runLabel = m.spinner.View() + "  " + StyleWarn.Render("stopping...")
 	} else {
 		runLabel = StyleStatusRunning.Render(m.labelRunning)
 	}

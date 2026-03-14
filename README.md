@@ -68,17 +68,7 @@
 	  <p>
       <strong>Commodore</strong> is a role-driven CLI engine and Go SDK for
       building and orchestrating OctalMesh projects from a shared
-      <code>.commodore</code> configuration. It provides a consistent runtime
-      for platform-level foreman CLIs, module-level brigadier CLIs, and worker
-      CLIs, with role discovery driven by the current project.
-	    <br /><br />
-	    Built in <strong>Go</strong>, Commodore standardizes core workflows such
-      as <em>up</em>, <em>down</em>, <em>doctor</em>, <em>modules</em>,
-      delegated <em>hire</em> commands, and brigadier proxy commands, while
-      keeping project-specific behavior extensible through the public SDK. It is
-      the shared operational layer used to orchestrate Tilt-based development
-      environments, module tooling, and command delegation across OctalMesh
-      repositories.
+      <code>.commodore</code> configuration.
 	  </p>
 	</div>
   <br />

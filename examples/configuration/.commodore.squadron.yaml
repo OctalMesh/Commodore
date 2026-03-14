@@ -24,7 +24,7 @@ binary: custom        # Optional: Custom binary for this squadron to execute (de
 reactor:
   provider: tilt           # Specifies Tilt as the reactor provider for live updates and orchestration
   network:  commodore-mesh # Optional: Custom network for inter-unit communication
-  context: ./              # Optional: Build context for the reactor
+  context:  ./             # Optional: Build context for the reactor
 
   # Optional: Define the reactor configuration, such as the path to the Tiltfile
   # and any additional settings needed for the reactor to function properly.
@@ -105,11 +105,6 @@ manifest:
       interval: 30s
       timeout:  5s
       retries:  3
-
-  # Primitive execution unit
-  - id:   pmt-example
-    path: ./primitives/.commodore.example.yaml
-    tags: [ "primitives" ]
 
 # ============================================================================ #
 #                                  Maneuvers                                   #

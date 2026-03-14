@@ -52,11 +52,13 @@ source "${_SCRIPTS_DIR}/uninstall.sh"
 function _usage() {
     printf 'Commodore CLI %s\n\n' "${COMMODORE_VERSION}"
     printf 'Usage:\n'
-    printf '  commodore install   <path> <name> [alias...]   Build and install a CLI binary.\n'
-    printf '  commodore uninstall <name> [alias...]          Remove an installed CLI binary.\n'
+    printf '  commodore install   [path] [name] [alias...]   Build and install a CLI binary.\n'
+    printf '  commodore uninstall [name] [alias...]          Remove an installed CLI binary.\n'
     printf '  commodore help                                 Show this help message.\n'
     printf '\nExamples:\n'
+    printf '  commodore install                              Install standard Commodore CLI from this repo\n'
     printf '  commodore install ./cli octalweb ow\n'
+    printf '  commodore uninstall                            Uninstall standard Commodore CLI\n'
     printf '  commodore uninstall octalweb ow\n'
     printf '\nEnvironment:\n'
     printf '  INSTALL_DIR   Destination directory (default: %s)\n' "${INSTALL_DIR}"

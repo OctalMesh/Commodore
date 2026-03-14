@@ -19,7 +19,7 @@ complex microservice ecosystems through recursive nodes.
 
 ## 🛰 Squadron Commander Reference
 
-`commodore.squadron.yaml`
+`.commodore.squadron.yaml` (template name in this `examples` folder)
 
 | Field                       | Type       | Possible Values / Format                 | Description                                                             |
 |-----------------------------|------------|------------------------------------------|-------------------------------------------------------------------------|
@@ -37,7 +37,6 @@ complex microservice ecosystems through recursive nodes.
 | **manifest[].path**         | `string`   | Path                                     | Points to a directory or a specific `.yaml` file.                       |
 | **manifest[].tags**         | `list`     | List of strings                          | Optional: Used for grouping and dependency management.                  |
 | **manifest[].after**        | `list`     | `id` or `$tag-name`                      | Wait for specified IDs or all units with a certain tag to be healthy.   |
-| **manifest[].critical**     | `bool`     | `true`, `false`                          | If true, whole squadron is unhealthy if this subordinate is unhealthy.  |
 | **manifest[].healthcheck**  | `object`   | `test`, `interval`, `timeout`, `retries` | Define how to verify the subordinate's readiness.                       |
 | **maneuvers**               | `list`     | List of actions                          | Executable actions that this squadron can perform by using the CLI.     |
 | **maneuvers[].call**        | `string`   | Command name                             | The identifier used to trigger the maneuver (e.g., `lint`, `test`).     |
@@ -46,7 +45,7 @@ complex microservice ecosystems through recursive nodes.
 
 ## Unit Designation Reference
 
-`commodore.unit.yaml`
+`.commodore.unit.yaml` (template name in this `examples` folder)
 
 | Field                       | Type     | Possible Values / Format     | Description                                                          |
 |-----------------------------|----------|------------------------------|----------------------------------------------------------------------|
@@ -88,8 +87,9 @@ the defined structure and dependencies.
 |--------------|-----------------------------------------------------------------------------------|
 | `up`         | Start the current squadron or unit and all its subordinates in the correct order. |
 | `down`       | Stop all reactors and cleanup resources within the squadron.                      |
-| `doctor`     | Run diagnostics to ensure reqirements are met and configurations are valid.       |
+| `doctor`     | Run diagnostics to ensure requirements are met and configurations are valid.      |
 | `status`     | Show the health status of all units and squadrons in the current context.         |
+| `tree`       | Show the discovered subordinate structure as a tree view.                         |
 | `completion` | Generate the autocompletion script for the specified shell                        |
 | `modules`    | Manage git submodules (status, init, update, sync)                                |
 | `signal`     | Send a command or maneuver to a specific subordinate.                             |

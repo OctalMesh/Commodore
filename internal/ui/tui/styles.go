@@ -23,4 +23,5 @@ var (
 	StyleStatusRunning = lipgloss.NewStyle().Foreground(styles.Mint)
 	StyleTabActive     = lipgloss.NewStyle().Foreground(styles.Mint).Bold(true)
 	StyleTab           = lipgloss.NewStyle().Foreground(styles.Muted)
+	StyleWarn          = lipgloss.NewStyle().Foreground(styles.Warn)
 )

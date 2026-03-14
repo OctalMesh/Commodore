@@ -12,7 +12,7 @@ import (
 	"github.com/OctalMesh/Commodore/pkg/sdk"
 )
 
-// Version info injected at build time
+// Version info injected at build time.
 var Version = "v1.0.0"
 
 func main() {
