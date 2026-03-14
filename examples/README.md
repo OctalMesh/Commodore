@@ -39,7 +39,7 @@ complex microservice ecosystems through recursive nodes.
 | **manifest[].after**        | `list`     | `id` or `$tag-name`                      | Wait for specified IDs or all units with a certain tag to be healthy.   |
 | **manifest[].critical**     | `bool`     | `true`, `false`                          | If true, whole squadron is unhealthy if this subordinate is unhealthy.  |
 | **manifest[].healthcheck**  | `object`   | `test`, `interval`, `timeout`, `retries` | Define how to verify the subordinate's readiness.                       |
-| **maneuvers**               | `list`     | List of actions                          | Executable actions that this unit can perform by using the CLI.         |
+| **maneuvers**               | `list`     | List of actions                          | Executable actions that this squadron can perform by using the CLI.     |
 | **maneuvers[].call**        | `string`   | Command name                             | The identifier used to trigger the maneuver (e.g., `lint`, `test`).     |
 | **maneuvers[].description** | `string`   | Any string                               | Human-readable explanation of the maneuver.                             |
 | **maneuvers[].action**      | `list`     | Array of strings                         | The actual command, script, or sequence of operations to execute.       |
