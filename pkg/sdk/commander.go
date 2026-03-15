@@ -112,7 +112,7 @@ func (commander *Commander) Execute() error {
 }
 
 func parseConfigurationFlag(arguments []string) string {
-	for index := 0; index < len(arguments); index++ {
+	for index := range arguments {
 		argument := arguments[index]
 		if (argument == "--config" || argument == "-c") && index+1 < len(arguments) {
 			return arguments[index+1]

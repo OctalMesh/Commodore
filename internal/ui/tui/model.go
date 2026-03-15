@@ -459,10 +459,7 @@ func (m Model) statusBar() string {
 	)
 	right := StyleMuted.Render(fmtElapsed(m.elapsed) + "  ")
 
-	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right)
-	if gap < 1 {
-		gap = 1
-	}
+	gap := max(m.width-lipgloss.Width(left)-lipgloss.Width(right), 1)
 	return left + strings.Repeat(" ", gap) + right
 }
 

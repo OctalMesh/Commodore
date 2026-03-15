@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 )
@@ -83,9 +84,7 @@ func BuildDependencyGraph(nodes []OrchestrationNode) (*DependencyGraph, error) {
 // ResolveStartupOrder returns a stable topological order.
 func (graph *DependencyGraph) ResolveStartupOrder() ([]OrchestrationNode, error) {
 	temporaryDependencyCount := make(map[string]int, len(graph.dependencyCount))
-	for nodeIdentifier, count := range graph.dependencyCount {
-		temporaryDependencyCount[nodeIdentifier] = count
-	}
+	maps.Copy(temporaryDependencyCount, graph.dependencyCount)
 
 	availableQueue := make([]string, 0, len(temporaryDependencyCount))
 	for nodeIdentifier, count := range temporaryDependencyCount {
@@ -129,9 +128,7 @@ func (graph *DependencyGraph) ResolveStartupOrder() ([]OrchestrationNode, error)
 // ResolveStartupWaves returns dependency-safe execution groups.
 func (graph *DependencyGraph) ResolveStartupWaves() ([][]OrchestrationNode, error) {
 	temporaryDependencyCount := make(map[string]int, len(graph.dependencyCount))
-	for nodeIdentifier, count := range graph.dependencyCount {
-		temporaryDependencyCount[nodeIdentifier] = count
-	}
+	maps.Copy(temporaryDependencyCount, graph.dependencyCount)
 
 	currentWaveNodeIdentifiers := make([]string, 0)
 	for nodeIdentifier, count := range temporaryDependencyCount {

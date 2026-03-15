@@ -29,7 +29,7 @@ func Tree(engine Engine) error {
 	}
 
 	engine.Info("%s", rootLabel)
-	for _, line := range strings.Split(structure, "\n") {
+	for line := range strings.SplitSeq(structure, "\n") {
 		engine.Info("%s", line)
 	}
 	return nil
