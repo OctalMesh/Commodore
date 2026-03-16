@@ -1,125 +1,241 @@
-# Commodore Examples
+<!--suppress HtmlDeprecatedAttribute, HtmlUnknownTarget -->
+<div align="center">
+  <h2>Commodore Examples</h2>
+  <p>Reference configurations and SDK usage for <strong>Commodore</strong></p>
+  <h6>
+    <a rel="noopener noreferrer" href="../README.md"><- Back to main README</a>
+    &nbsp;·&nbsp;
+    <a rel="noopener noreferrer" href="../CONTRIBUTING.md">Contributing</a>
+    &nbsp;·&nbsp;
+    <a rel="noopener noreferrer" href="../LICENSE.md">License</a>
+  </h6>
+</div>
 
-This directory contains reference configurations for the **Commodore**
-orchestration system. Commodore uses a naval-inspired hierarchy to manage
-complex microservice ecosystems through recursive nodes.
+<div align="center">
+  <h2>What's inside</h2>
+</div>
 
-## Hierarchy Overview
+```
+examples/
+├── configuration/
+│   ├── .commodore.squadron.yaml <- Full squadron config with every field
+│   └── .commodore.unit.yaml     <- Full unit config with every field
+└── sdk/
+    └── main.go                  <- Custom binary built with the Go SDK
+```
 
-> [!IMPORTANT]
-> Commodore by default looks for `.commodore[.yaml, .yml]` files in the project
-> directory. You can define what configuration file to use with the `--config`
-> flag when running the CLI.
+> [!NOTE]
+> These are reference templates - not a runnable project on their own. Copy the
+> relevant files into your project and adapt them to your needs.
 
-1. **Squadron (`.commodore.squadron.yaml`)**: A recursive manager (node). It
-   orchestrates other squadrons or units, manages environment cascading, and
-   defines the boot order.
-2. **Unit (`.commodore.unit.yaml`)**: An atomic execution unit (leaf). It
-   defines how a single service is built, run, and maintained via its "Reactor".
+<div align="center">
+  <h2>Hierarchy Quick Reference</h2>
+</div>
 
-## 🛰 Squadron Commander Reference
+Commodore models infrastructure as a naval fleet. Two config roles exist:
 
-`.commodore.squadron.yaml` (template name in this `examples` folder)
+```
+root-division         (squadron)  <- .commodore.yaml
+├── sqd-frontend      (squadron)  <- resolves to ./modules/frontend/.commodore.yaml
+│   └── app-desktop   (unit)      <- resolves to ./apps/desktop/.commodore.yaml
+├── svc-auth          (unit)      <- resolves to ./services/auth/.commodore.yaml
+└── svc-notification  (unit)      <- resolves to ./services/notification/.commodore.yaml
+```
 
-| Field                       | Type       | Possible Values / Format                 | Description                                                             |
-|-----------------------------|------------|------------------------------------------|-------------------------------------------------------------------------|
-| **role**                    | `string`   | `squadron`                               | Defines the role of this config as a squadron commander.                |
-| **id**                      | `string`   | Any unique string                        | Unique identifier (must be unique across the manifest).                 |
-| **binary**                  | `string`   | Default: `commodore`                     | Optional: Custom binary for this squadron to execute.                   |
-| **reactor**                 | `object`   | See below                                | Defines how this squadron manages its subordinates.                     |
-| **reactor.provider**        | `string`   | `tilt`                                   | Specifies the reactor provider.                                         |
-| **reactor.network**         | `string`   | Any string                               | Optional: Custom network for inter-unit communication.                  |
-| **reactor.context**         | `string`   | Path (e.g., `./`)                        | Optional: Build context for the reactor.                                |
-| **reactor.blueprints**      | `list`     | `env`, `path`                            | Mapping of environment names to specific configuration files.           |
-| **reactor.environments**    | `list`     | `name`, `files`, `variables`             | Define environment variables accessible to all units and sub-squadrons. |
-| **manifest**                | `list`     | List of subordinates                     | Defines the hierarchy. Each path leads to another config.               |
-| **manifest[].id**           | `string`   | Any string                               | Unique identifier for the subordinate (squadron or unit).               |
-| **manifest[].path**         | `string`   | Path                                     | Points to a directory or a specific `.yaml` file.                       |
-| **manifest[].tags**         | `list`     | List of strings                          | Optional: Used for grouping and dependency management.                  |
-| **manifest[].after**        | `list`     | `id` or `$tag-name`                      | Wait for specified IDs or all units with a certain tag to be healthy.   |
-| **manifest[].healthcheck**  | `object`   | `test`, `interval`, `timeout`, `retries` | Define how to verify the subordinate's readiness.                       |
-| **maneuvers**               | `list`     | List of actions                          | Executable actions that this squadron can perform by using the CLI.     |
-| **maneuvers[].call**        | `string`   | Command name                             | The identifier used to trigger the maneuver (e.g., `lint`, `test`).     |
-| **maneuvers[].description** | `string`   | Any string                               | Human-readable explanation of the maneuver.                             |
-| **maneuvers[].action**      | `list`     | Array of strings                         | The actual command, script, or sequence of operations to execute.       |
+Each node declares its own role, reactor, environments, and maneuvers. The root
+squadron stitches them together via `manifest`.
 
-## Unit Designation Reference
+<div align="center">
+  <h2>Configuration Examples</h2>
+</div>
 
-`.commodore.unit.yaml` (template name in this `examples` folder)
+Ready-to-copy YAML templates covering the full configuration surface.
 
-| Field                       | Type     | Possible Values / Format     | Description                                                          |
-|-----------------------------|----------|------------------------------|----------------------------------------------------------------------|
-| **role**                    | `string` | `unit`                       | Defines the role as a standalone execution unit.                     |
-| **id**                      | `string` | Any unique string            | Unique identifier (must match the ID in the Squadron manifest).      |
-| **reactor**                 | `object` | See below                    | Defines how this unit is built, run, and maintained.                 |
-| **reactor.provider**        | `string` | `tilt`, `native`             | Specifies the reactor provider.                                      |
-| **reactor.context**         | `string` | Path (e.g., `./`)            | Optional: Build context for the reactor.                             |
-| **reactor.blueprints**      | `list`   | `env`, `path`, `action`      | Environment-specific logic. Can be a path or a direct command array. |
-| **reactor.environments**    | `list`   | `name`, `files`, `variables` | Local environment variables and `.env` file overrides.               |
-| **maneuvers**               | `list`   | List of actions              | Executable actions that this unit can perform by using the CLI.      |
-| **maneuvers[].call**        | `string` | Command name                 | The identifier used to trigger the maneuver (e.g., `lint`, `test`).  |
-| **maneuvers[].description** | `string` | Any string                   | Human-readable explanation of the maneuver.                          |
-| **maneuvers[].action**      | `list`   | Array of strings             | The actual command, script, or sequence of operations to execute.    |
+### `.commodore.squadron.yaml`
 
-## Variable Cascading Logic
+Defines a **squadron** - a recursive orchestrator that manages subordinates.
 
-Commodore employs a **Top-Down Inheritance** model for environment variables:
-1. **Fleet Level**: Global defaults.
-2. **Squadron Level**: Mid-level overrides (applied to all subordinates).
-3. **Unit Level**: Final local overrides (highest priority).
+Key concepts demonstrated:
 
-## Startup Sequence
-
-The boot order is determined by the `after` field in the Squadron manifest.
-- Use **Direct ID** (`svc-auth`) for specific dependencies.
-- Use **Tag Selectors** (`$tag-backend`) to wait for an entire group of units to
-  become healthy before proceeding.
-
-## CLI Usage
-
-Commodore generates a dynamic CLI based on your hierarchy. You can execute
-commands at any level, and the system will handle the orchestration according to
-the defined structure and dependencies.
-
-### Base Commands
-
-| Command      | Description                                                                       |
-|--------------|-----------------------------------------------------------------------------------|
-| `up`         | Start the current squadron or unit and all its subordinates in the correct order. |
-| `down`       | Stop all reactors and cleanup resources within the squadron.                      |
-| `doctor`     | Run diagnostics to ensure requirements are met and configurations are valid.      |
-| `status`     | Show the health status of all units and squadrons in the current context.         |
-| `tree`       | Show the discovered subordinate structure as a tree view.                         |
-| `completion` | Generate the autocompletion script for the specified shell                        |
-| `modules`    | Manage git submodules (status, init, update, sync)                                |
-| `signal`     | Send a command or maneuver to a specific subordinate.                             |
-
-### Flags & Environments
-
-| Flag                    | Description                                                                                               |
-|-------------------------|-----------------------------------------------------------------------------------------------------------|
-| `-h`, `--help`          | Show help information for current command.                                                                |
-| `-e`,`--env <name>`     | Specify environment (e.g., `dev`, `staging`). Should match one of the defined environments in the config. |
-| `-c`, `--config <path>` | Path to a custom configuration file.                                                                      |
-| `-t`, `--tags <tags>`   | Filter operations to specific groups (e.g., `commodore up -t backend`).                                   |
-
-### Recursive Navigation
-
-Access subordinates directly by their IDs in the command path. This allows you
-to run maneuvers or commands on specific units or squadrons without affecting
-the entire hierarchy.
+| Feature                                    | Where                    |
+|--------------------------------------------|--------------------------|
+| `role: squadron` declaration               | Top of file              |
+| Tilt reactor with multi-env blueprints     | `reactor.blueprints`     |
+| Environment variable cascading             | `reactor.environments`   |
+| Manifest with tag-based `after:` selectors | `manifest[].after`       |
+| Health checks per subordinate              | `manifest[].healthcheck` |
+| Custom maneuver (`deploy`)                 | `maneuvers`              |
 
 ```bash
-# General pattern: [binary] signal [subordinate-id] [command/maneuver]
+# Copy to your project root and rename
+cp examples/configuration/.commodore.squadron.yaml ./.commodore.yaml
+```
 
-# Execute a maneuver on a direct Unit
+### `.commodore.unit.yaml`
+
+Defines a **unit** - an atomic execution leaf for a single service.
+
+Key concepts demonstrated:
+
+| Feature                                           | Where                  |
+|---------------------------------------------------|------------------------|
+| `role: unit` declaration                          | Top of file            |
+| Tilt blueprint + native `action:` blueprint       | `reactor.blueprints`   |
+| Per-unit environment variables and `.env` loading | `reactor.environments` |
+| Multiple maneuvers (`deploy`, `lint`, `test`)     | `maneuvers`            |
+
+```bash
+# Copy next to your service and rename
+cp examples/configuration/.commodore.unit.yaml ./services/my-service/.commodore.yaml
+```
+
+> [!IMPORTANT]
+> The `id:` in a unit config **must match** the `id:` declared for that
+> subordinate in the parent squadron's `manifest`.
+
+<div align="center">
+  <h2>Common Patterns</h2>
+</div>
+
+### Start the full stack for `dev`
+
+```bash
+commodore up --env dev
+```
+
+### Start only backend services
+
+```bash
+commodore up --tags backend
+```
+
+### Run a maneuver on a specific unit
+
+```bash
 commodore signal svc-auth test
+commodore signal svc-auth lint
+```
 
-# Delegate a command to a sub-Squadron
-commodore signal sqd-frontend up
+### Start a sub-squadron and all its subordinates for `staging`
 
-# Chain of Command (Deep Delegation)
-# This signals 'sqd-frontend' to then signal its own 'app-web' subordinate to
-# run the 'lint' maneuver defined in its config.
+```bash
+commodore signal sqd-frontend up --env staging
+```
+
+### Deep delegation - target any node without `cd`
+
+```bash
+# From the root: tell sqd-frontend to tell app-web to run lint
 commodore signal sqd-frontend signal app-web lint
 ```
+
+### Validate everything before `up`
+
+```bash
+commodore doctor --env staging
+```
+
+### Inspect the discovered hierarchy
+
+```bash
+commodore tree
+```
+
+<div align="center">
+  <h2>Config Resolution</h2>
+</div>
+
+Commodore resolves subordinate configs by looking for files in the subordinate's
+directory, following this order:
+
+1. `<path>/.commodore.yaml`
+2. `<path>/.commodore.yml`
+3. `<path>/.commodore`
+
+> [!TIP]
+> You can point `path:` directly to a specific YAML file if you don't want to
+> use the default naming convention.
+
+<div align="center">
+  <!--
+  =====================
+         FOOTER
+  =====================
+  -->
+  <h1></h1>
+  <br />
+  <!-- OctalMesh Logo -->
+  <a rel="noopener noreferrer" target="_blank" href="https://octalmesh.com">
+    <picture>
+      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/logo/svg/octal_mesh_center.svg" />
+      <img alt="OctalMesh" src="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/logo/svg/octal_mesh_center_white.svg" height="48" />
+    </picture>
+  </a>
+  <br /><br />
+  <!-- Socials -->
+  <div>
+    <!-- Telegram Badge -->
+    <a rel="noopener noreferrer" target="_blank" href="https://octalmesh.com/telegram">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/telegram.svg" />
+        <img alt="Telegram" src="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/telegram_white.svg" width="48" />
+      </picture>
+    </a>
+    &nbsp;
+    <!-- YouTube Badge -->
+    <a rel="noopener noreferrer" target="_blank" href="https://octalmesh.com/youtube">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/youtube.svg" />
+        <img alt="YouTube" src="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/youtube_white.svg" width="48" />
+      </picture>
+    </a>
+    &nbsp;
+    <!-- TikTok Badge -->
+    <a rel="noopener noreferrer" target="_blank" href="https://octalmesh.com/tiktok">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/tiktok.svg" />
+        <img alt="TikTok" src="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/tiktok_white.svg" width="48" />
+      </picture>
+    </a>
+    &nbsp;
+    <!-- Instagram Badge -->
+    <a rel="noopener noreferrer" target="_blank" href="https://octalmesh.com/instagram">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/instagram.svg" />
+        <img alt="Instagram" src="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/instagram_white.svg" width="48" />
+      </picture>
+    </a>
+    &nbsp;
+    <!-- X Badge -->
+    <a rel="noopener noreferrer" target="_blank" href="https://octalmesh.com/x">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/x.svg" />
+        <img alt="X" src="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/x_white.svg" width="48" />
+      </picture>
+    </a>
+    &nbsp;
+    <!-- Reddit Badge -->
+    <a rel="noopener noreferrer" target="_blank" href="https://octalmesh.com/reddit">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/reddit.svg" />
+        <img alt="Reddit" src="https://raw.githubusercontent.com/OctalMesh/OctalDesign/release/assets/icon/svg/reddit_white.svg" width="48" />
+      </picture>
+    </a>
+  </div>
+</div>
+<h6>
+  <div align="center">
+    • • •
+    <br /><br />
+    This project is licensed under the <a rel="noopener noreferrer" href="../LICENSE.md">MIT License</a>
+    <br /><br />
+  </div>
+  <div align="justify">
+    <ul>
+      <li>Feel free to use this project for any purpose, including commercial applications.</li>
+      <li>You are permitted to modify, distribute, and include this project in any form, as long as the original copyright notice is retained.</li>
+      <li>If you share or publish modified versions, attribution to the original <a rel="noopener noreferrer" href="https://github.com/OctalMesh/Commodore">GitHub repository</a> is appreciated.</li>
+      <li>This software is provided "as is", without any warranties or guarantees, as detailed in the license terms.</li>
+    </ul>
+  </div>
+</h6>

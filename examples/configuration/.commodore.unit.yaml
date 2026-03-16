@@ -33,7 +33,7 @@ reactor:
       path: ./staging/Tiltfile
 
     # Native provider blueprint example:
-    - env: dev
+    - env:    dev
       action: [ "docker", "build", "-t", "svc-auth:dev", "." ] # Command to build the service for the dev environment
 
   # Optional: Define environment variables for the unit, accessible to the
