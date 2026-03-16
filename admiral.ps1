@@ -1219,6 +1219,15 @@ function Main {
     }
 }
 
+# Pauses script exit when running as a scriptblock, to allow reading final
+# output.
+function Invoke-ExitPause {
+    if ($script:IS_SCRIPTBLOCK -and -not $script:EXIT_PAUSE_DONE) {
+        $script:EXIT_PAUSE_DONE = $true
+        Read-Host "`nPress Enter to exit"
+    }
+}
+
 # Assemble entry args from PowerShell's own param() block
 
 $entryArgs = [System.Collections.Generic.List[string]]::new()
@@ -1235,8 +1244,20 @@ if ($Arguments) {
     }
 }
 
-Main -CliArgs $entryArgs.ToArray()
+$script:IS_SCRIPTBLOCK = (
+$MyInvocation.InvocationName -eq '&' -or
+    [string]::IsNullOrWhiteSpace($MyInvocation.InvocationName)
+)
 
-if ($MyInvocation.InvocationName -eq '&' -or [string]::IsNullOrWhiteSpace($MyInvocation.InvocationName)) {
-    Read-Host "`nPress Enter to exit"
+$script:EXIT_PAUSE_DONE = $false
+
+trap {
+    Invoke-ExitPause
+    break
+}
+
+try {
+    Main -CliArgs $entryArgs.ToArray()
+} finally {
+    Invoke-ExitPause
 }
