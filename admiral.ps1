@@ -8,20 +8,26 @@ param(
 )
 
 # ============================================================================ #
-# Admiral CLI Tool                                                             #
-#                                                                              #
-# Description:                                                                 #
-#   Single-file installer for Commodore CLI binaries on Windows.               #
+# Admiral CLI                                                                  #
 #                                                                              #
 # Usage:                                                                       #
-#   ./admiral <command> [args]                                                 #
+#   admiral [options] <command> [command-args]                                 #
+#                                                                              #
+# Options:                                                                     #
+#   -e, --env <path>                    Use custom dotenv file                 #
 #                                                                              #
 # Commands:                                                                    #
-#   install   [path] [name] [alias...] Build and install a CLI binary.         #
-#   build     [path] [name]            Build binaries for multiple OS targets. #
-#   lint      [path]                   Run golangci-lint via `go tool`.        #
-#   uninstall [name] [alias...]        Remove an installed CLI binary.         #
-#   help                               Show this help message.                 #
+#   help                                Show this help message                 #
+#   lint      [path]                    Run 'golangci-lint' via go tool        #
+#   build     [path] [name]             Build Cross-platform binaries          #
+#   install   [path] [name] [alias...]  Build and install a CLI binary         #
+#   uninstall [name] [alias...]         Remove an installed CLI binary         #
+#                                                                              #
+# Environment:                                                                 #
+#   ADMIRAL_BINARY_NAME  Primary binary name                                   #
+#   ADMIRAL_SOURCE_DIR   Default source path                                   #
+#   ADMIRAL_BUILD_DIR    Cross-build output directory                          #
+#   ADMIRAL_INSTALL_DIR  Destination directory                                 #
 # ============================================================================ #
 
 $ErrorActionPreference = 'Stop'
@@ -30,10 +36,11 @@ $ErrorActionPreference = 'Stop'
 #                                  Variables                                   #
 # ============================================================================ #
 
-$script:INSTALL_DIR         = ''
-$script:BUILD_DIR           = ''
-$script:DEFAULT_BINARY_NAME = ''
-$script:LAUNCH_DIR          = (Get-Location).Path
+$script:LAUNCH_DIR  = (Get-Location).Path
+$script:BINARY_NAME = ''
+$script:SOURCE_DIR  = ''
+$script:BUILD_DIR   = ''
+$script:INSTALL_DIR = ''
 
 # Box-drawing characters for table formatting
 
@@ -121,6 +128,25 @@ function Import-DotenvFile {
     }
 }
 
+# Returns env variable value or provided default when env value is empty.
+#
+# Arguments:
+#   Name         - Environment variable name.
+#   DefaultValue - Fallback value.
+function Get-EnvOrDefault {
+    param(
+        [string]$Name,
+        [string]$DefaultValue
+    )
+
+    $value = [Environment]::GetEnvironmentVariable($Name, 'Process')
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        return $DefaultValue
+    }
+
+    return $value
+}
+
 # Applies runtime config values.
 #
 # Arguments:
@@ -129,13 +155,10 @@ function Initialize-EnvConfig {
     param([string]$CustomEnvPath)
 
     # 1) Built-in defaults
-    $defaultInstallDir = Join-Path $HOME '.local\bin'
-    $defaultBuildDir   = Join-Path $script:LAUNCH_DIR 'build'
     $defaultBinaryName = 'commodore'
-
-    $env:INSTALL_DIR         = $defaultInstallDir
-    $env:BUILD_DIR           = $defaultBuildDir
-    $env:DEFAULT_BINARY_NAME = $defaultBinaryName
+    $defaultSourceDir  = $script:LAUNCH_DIR
+    $defaultBuildDir   = Join-Path $script:LAUNCH_DIR 'build'
+    $defaultInstallDir = Join-Path $HOME '.local\bin'
 
     # 2) .env.example
     Import-DotenvFile -FilePath (Join-Path $script:LAUNCH_DIR '.env.example')
@@ -145,16 +168,26 @@ function Initialize-EnvConfig {
 
     # 4) Custom file from --env/-e
     if (-not [string]::IsNullOrWhiteSpace($CustomEnvPath)) {
+        $CustomEnvPath = Resolve-AbsolutePathValue -PathValue $CustomEnvPath -BasePath $script:LAUNCH_DIR
         Import-DotenvFile -FilePath $CustomEnvPath
     }
 
-    $script:INSTALL_DIR         = if ([string]::IsNullOrWhiteSpace($env:INSTALL_DIR))         { $defaultInstallDir } else { $env:INSTALL_DIR }
-    $script:BUILD_DIR           = if ([string]::IsNullOrWhiteSpace($env:BUILD_DIR))           { $defaultBuildDir }   else { $env:BUILD_DIR }
-    $script:DEFAULT_BINARY_NAME = if ([string]::IsNullOrWhiteSpace($env:DEFAULT_BINARY_NAME)) { $defaultBinaryName } else { $env:DEFAULT_BINARY_NAME }
+    $script:BINARY_NAME = Get-EnvOrDefault -Name 'ADMIRAL_BINARY_NAME' -DefaultValue $defaultBinaryName
+    $script:SOURCE_DIR  = Get-EnvOrDefault -Name 'ADMIRAL_SOURCE_DIR'  -DefaultValue $defaultSourceDir
+    $script:BUILD_DIR   = Get-EnvOrDefault -Name 'ADMIRAL_BUILD_DIR'   -DefaultValue $defaultBuildDir
+    $script:INSTALL_DIR = Get-EnvOrDefault -Name 'ADMIRAL_INSTALL_DIR' -DefaultValue $defaultInstallDir
 
-    $env:INSTALL_DIR         = $script:INSTALL_DIR
-    $env:BUILD_DIR           = $script:BUILD_DIR
-    $env:DEFAULT_BINARY_NAME = $script:DEFAULT_BINARY_NAME
+    foreach ($pathVar in @('SOURCE_DIR', 'BUILD_DIR', 'INSTALL_DIR')) {
+        $current    = Get-Variable -Name $pathVar -Scope Script -ValueOnly
+        $normalized = Resolve-AbsolutePathValue -PathValue $current -BasePath $script:LAUNCH_DIR
+
+        Set-Variable -Name $pathVar -Scope Script -Value $normalized
+    }
+
+    $env:ADMIRAL_BINARY_NAME = $script:BINARY_NAME
+    $env:ADMIRAL_SOURCE_DIR  = $script:SOURCE_DIR
+    $env:ADMIRAL_BUILD_DIR   = $script:BUILD_DIR
+    $env:ADMIRAL_INSTALL_DIR = $script:INSTALL_DIR
 }
 
 # Parses global options before command dispatch.
@@ -190,7 +223,8 @@ function Get-GlobalArgs {
         break
     }
 
-    $remaining = if ($index -lt $CliArgs.Count) { $CliArgs[$index..($CliArgs.Count - 1)] } else { @() }
+    $remaining = if ($index -lt $CliArgs.Count) { $CliArgs[$index..($CliArgs.Count - 1)] }
+                 else                           { @() }
 
     return [pscustomobject]@{
         CustomEnv = $customEnv
@@ -279,6 +313,36 @@ function Resolve-AbsoluteDirectory {
     return (Resolve-Path -LiteralPath $PathValue).Path
 }
 
+# Resolves a path to absolute form, using BasePath for relative input.
+# Supports '~' and '~/...' expansion.
+#
+# Arguments:
+#   PathValue - Path to normalize.
+#   BasePath  - Base directory for relative paths.
+function Resolve-AbsolutePathValue {
+    param(
+        [string]$PathValue,
+        [string]$BasePath = $script:LAUNCH_DIR
+    )
+
+    if ([string]::IsNullOrWhiteSpace($PathValue)) {
+        return $PathValue
+    }
+
+    $expanded = [Environment]::ExpandEnvironmentVariables($PathValue)
+    if ($expanded -eq '~') {
+        $expanded = $HOME
+    } elseif ($expanded.StartsWith('~/') -or $expanded.StartsWith('~\')) {
+        $expanded = Join-Path $HOME $expanded.Substring(2)
+    }
+
+    if ([System.IO.Path]::IsPathRooted($expanded)) {
+        return [System.IO.Path]::GetFullPath($expanded)
+    }
+
+    return [System.IO.Path]::GetFullPath((Join-Path $BasePath $expanded))
+}
+
 # Detects nearest Go module root by walking up directories.
 #
 # Arguments:
@@ -341,18 +405,20 @@ function Resolve-BuildTarget {
         [string]$Name
     )
 
-    $cleanedSource = $Source.TrimEnd('/', '\')
+    $cleanedSource = (Resolve-AbsolutePathValue -PathValue $Source -BasePath $script:LAUNCH_DIR).TrimEnd('/', '\')
     if ([string]::IsNullOrWhiteSpace($cleanedSource)) {
         $cleanedSource = '.'
     }
 
-    if (Test-Path -LiteralPath (Join-Path $cleanedSource 'main.go') -PathType Leaf) {
-        return $cleanedSource
-    }
+    $candidates = @(
+        $cleanedSource
+        (Join-Path $cleanedSource "cmd/$Name")
+    )
 
-    $cmdTarget = Join-Path $cleanedSource "cmd/$Name"
-    if (Test-Path -LiteralPath (Join-Path $cmdTarget 'main.go') -PathType Leaf) {
-        return $cmdTarget
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath (Join-Path $candidate 'main.go') -PathType Leaf) {
+            return $candidate
+        }
     }
 
     return $null
@@ -389,9 +455,10 @@ function Resolve-BuildContext {
     }
 
     return [pscustomobject]@{
-        BuildTarget = $buildTarget
-        ModuleRoot  = $moduleRoot
-        PackagePath = $packagePath
+        BuildTarget      = $buildTarget
+        ModuleRoot       = $moduleRoot
+        PackageDirectory = $packageDirectory
+        PackagePath      = $packagePath
     }
 }
 
@@ -460,7 +527,8 @@ function Format-TableCell {
         [int]$Width
     )
 
-    $value = if ($null -eq $Text) { '' } else { $Text }
+    $value = if ($null -eq $Text) { '' }
+             else                 { $Text }
     if ($value.Length -gt $Width) {
         $value = $value.Substring(0, [Math]::Max(0, $Width - 3)) + '...'
     }
@@ -529,7 +597,8 @@ function Write-TableRow {
     )
 
     $cells = for ($i = 0; $i -lt $Widths.Count; $i++) {
-        $text = if ($i -lt $Values.Count) { $Values[$i] } else { '' }
+        $text = if ($i -lt $Values.Count) { $Values[$i] }
+                else                      { '' }
         Format-TableCell -Text $text -Width $Widths[$i]
     }
 
@@ -548,9 +617,9 @@ function Write-BuildSummaryTable {
         return
     }
 
-    $ok    = @($Rows | Where-Object { $_.Status -eq 'OK'   }).Count
-    $fail  = @($Rows | Where-Object { $_.Status -eq 'FAIL' }).Count
-    $skip  = @($Rows | Where-Object { $_.Status -eq 'SKIP' }).Count
+    $ok   = @($Rows | Where-Object { $_.Status -eq 'OK'   }).Count
+    $fail = @($Rows | Where-Object { $_.Status -eq 'FAIL' }).Count
+    $skip = @($Rows | Where-Object { $_.Status -eq 'SKIP' }).Count
 
     $wTarget   = 14
     $wStatus   = 8
@@ -603,7 +672,8 @@ function Add-InstallDirToPath {
     }
 
     $current         = [Environment]::GetEnvironmentVariable('PATH', 'User')
-    $existingEntries = if ([string]::IsNullOrWhiteSpace($current)) { @() } else { $current -split ';' }
+    $existingEntries = if ([string]::IsNullOrWhiteSpace($current)) { @() }
+                       else                                        { $current -split ';' }
 
     $alreadyPresent = $false
     foreach ($entry in $existingEntries) {
@@ -618,7 +688,8 @@ function Add-InstallDirToPath {
         return
     }
 
-    $updated = if ([string]::IsNullOrWhiteSpace($current)) { $Directory } else { "$current;$Directory" }
+    $updated = if ([string]::IsNullOrWhiteSpace($current)) { $Directory }
+               else                                        { "$current;$Directory" }
     [Environment]::SetEnvironmentVariable('PATH', $updated, 'User')
 
     Write-Succ 'Added to User PATH (Windows registry).'
@@ -675,115 +746,83 @@ function Remove-InstallDirFromPath {
 #                               Commands                                       #
 # ============================================================================ #
 
-# Handles `install` command.
+# Prints full usage information and examples.
+function Show-Usage {
+    @"
+
+  Admiral CLI
+
+  Usage:
+    admiral [options] <command> [command-args]
+
+  Options:
+    -e, --env <path>                    Use custom dotenv file
+
+  Commands:
+    help                                Show this help message
+    lint      [path]                    Run 'golangci-lint' via go tool
+    build     [path] [name]             Build Cross-platform binaries
+    install   [path] [name] [alias...]  Build and install a CLI binary
+    uninstall [name] [alias...]         Remove an installed CLI binary
+
+  Environment:
+    ADMIRAL_BINARY_NAME  Primary binary name          (default: $env:ADMIRAL_BINARY_NAME)
+    ADMIRAL_SOURCE_DIR   Default source path          (default: $env:ADMIRAL_SOURCE_DIR)
+    ADMIRAL_BUILD_DIR    Cross-build output directory (default: $env:ADMIRAL_BUILD_DIR)
+    ADMIRAL_INSTALL_DIR  Destination directory        (default: $env:ADMIRAL_INSTALL_DIR)
+
+"@ | Write-Host
+}
+
+# Handles 'lint' command.
 #
 # Arguments:
-#   RemainingArgs - Optional [path] [name] [alias...]
-function Invoke-Install {
+#   RemainingArgs - Optional [path] used to resolve module root.
+function Invoke-Lint {
     param([string[]]$RemainingArgs)
 
-    $source  = '.'
-    $name    = $script:DEFAULT_BINARY_NAME
-    $aliases = @()
+    $source     = if ($RemainingArgs.Count -gt 0) { $RemainingArgs[0] }
+                  else                            { $script:SOURCE_DIR }
+    $source     = Resolve-AbsolutePathValue -PathValue $source -BasePath $script:LAUNCH_DIR
+    $moduleRoot = Find-GoModuleRoot -StartDirectory $source
 
-    switch ($RemainingArgs.Count) {
-        0 { }
-        1 {
-            $source = $RemainingArgs[0]
-        }
-        default {
-            $source = $RemainingArgs[0]
-            $name   = $RemainingArgs[1]
-
-            if ($RemainingArgs.Count -gt 2) {
-                $aliases = $RemainingArgs[2..($RemainingArgs.Count - 1)]
-            }
-        }
-    }
-
-    $binName      = Get-BinName -Base $name
-    $buildContext = Resolve-BuildContext -Source $source -Name $name
-
-    if (-not $buildContext) {
-        Write-Fail "Build target not found for source '$source' and binary '$name'."
-        Write-Info "Expected one of: $source/main.go or $source/cmd/$name/main.go"
+    if (-not $moduleRoot) {
+        Write-Fail "Go module root not found for '$source'."
+        Write-Info 'Run lint inside a Go module or pass a path inside one.'
         exit 1
     }
 
-    $buildArtifact = Join-Path (Get-Location).Path $binName
+    Write-Info "Linting      $moduleRoot"
+    Write-Info 'Command      go tool golangci-lint run ./...'
 
-    Write-InfoDivider
-    Write-Info "Building     $binName"
-    Write-Info "Source       $source"
-    Write-Info "Target       $($buildContext.BuildTarget)"
-    Write-Info "Module Root  $($buildContext.ModuleRoot)"
-    Write-Info "Package      $($buildContext.PackagePath)"
-    Write-Info "Destination  $script:INSTALL_DIR"
-    Write-InfoDivider
-
-    Invoke-GoBuild -ModuleRoot $buildContext.ModuleRoot -PackagePath $buildContext.PackagePath -OutputPath $buildArtifact
-    Write-Succ     "Built        $binName"
-
-    New-Item   -ItemType Directory -Path $script:INSTALL_DIR -Force | Out-Null
-    Move-Item  -LiteralPath $buildArtifact -Destination (Join-Path $script:INSTALL_DIR $binName) -Force
-    Write-Succ "Installed    $(Join-Path $script:INSTALL_DIR $binName)"
-
-    foreach ($aliasName in $aliases) {
-        $aliasBin = Get-BinName -Base $aliasName
-
-        Copy-Item  -LiteralPath (Join-Path $script:INSTALL_DIR $binName) -Destination (Join-Path $script:INSTALL_DIR $aliasBin) -Force
-        Write-Succ "Copy         $(Join-Path $script:INSTALL_DIR $aliasBin)  ->  $binName"
-    }
-
-    Add-InstallDirToPath -Directory $script:INSTALL_DIR
-}
-
-# Handles `uninstall` command.
-#
-# Arguments:
-#   RemainingArgs - Optional [name] [alias...]
-function Invoke-Uninstall {
-    param([string[]]$RemainingArgs)
-
-    $name    = $script:DEFAULT_BINARY_NAME
-    $aliases = @()
-
-    if ($RemainingArgs.Count -gt 0) {
-        $name = $RemainingArgs[0]
-
-        if ($RemainingArgs.Count -gt 1) {
-            $aliases = $RemainingArgs[1..($RemainingArgs.Count - 1)]
+    Push-Location $moduleRoot
+    try {
+        & go tool golangci-lint run ./...
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail 'Lint failed.'
+            exit $LASTEXITCODE
         }
+    } finally {
+        Pop-Location
     }
 
-    Remove-One -BaseName $name -Label 'binary'
-    foreach ($aliasName in $aliases) {
-        Remove-One -BaseName $aliasName -Label 'alias'
-    }
-
-    Remove-InstallDirFromPath -Directory $script:INSTALL_DIR
+    Write-Succ 'Lint passed'
 }
 
-# Handles `build` command.
+# Handles 'build' command.
 #
 # Arguments:
 #   RemainingArgs - Optional [path] [name]
 function Invoke-Build {
     param([string[]]$RemainingArgs)
 
-    $source = '.'
-    $name   = $script:DEFAULT_BINARY_NAME
+    $source = $script:SOURCE_DIR
+    $name   = $script:BINARY_NAME
 
-    switch ($RemainingArgs.Count) {
-        0 { }
-        1 {
-            $source = $RemainingArgs[0]
-        }
-        default {
-            $source = $RemainingArgs[0]
-            $name   = $RemainingArgs[1]
-        }
-    }
+    if ($RemainingArgs.Count -gt 0) { $source = $RemainingArgs[0] }
+    if ($RemainingArgs.Count -gt 1) { $name   = $RemainingArgs[1] }
+
+    $source = Resolve-AbsolutePathValue -PathValue $source -BasePath $script:LAUNCH_DIR
 
     $buildContext = Resolve-BuildContext -Source $source -Name $name
     if (-not $buildContext) {
@@ -793,14 +832,18 @@ function Invoke-Build {
     }
 
     $cwd       = (Get-Location).Path
-    $outputDir = if ($script:BUILD_DIR) { $script:BUILD_DIR } elseif ($env:BUILD_DIR) { $env:BUILD_DIR } else { Join-Path $cwd 'build' }
+    $outputDir = if     ($script:BUILD_DIR)      { $script:BUILD_DIR }
+                 elseif ($env:ADMIRAL_BUILD_DIR) { $env:ADMIRAL_BUILD_DIR }
+                 else                            { Join-Path $cwd 'build' }
+
+    $outputDir = Resolve-AbsolutePathValue -PathValue $outputDir -BasePath $cwd
 
     Write-InfoDivider
     Write-Info "Building     $name"
     Write-Info "Source       $source"
     Write-Info "Target       $($buildContext.BuildTarget)"
     Write-Info "Module Root  $($buildContext.ModuleRoot)"
-    Write-Info "Package      $($buildContext.PackagePath)"
+    Write-Info "Package Dir  $($buildContext.PackageDirectory)"
     Write-Info "Output Dir   $outputDir"
     Write-InfoDivider
 
@@ -869,73 +912,84 @@ function Invoke-Build {
     }
 }
 
-# Handles `lint` command.
+# Handles 'install' command.
 #
 # Arguments:
-#   RemainingArgs - Optional [path] used to resolve module root.
-function Invoke-Lint {
+#   RemainingArgs - Optional [path] [name] [alias...]
+function Invoke-Install {
     param([string[]]$RemainingArgs)
 
-    $source     = if ($RemainingArgs.Count -gt 0) { $RemainingArgs[0] } else { '.' }
-    $moduleRoot = Find-GoModuleRoot -StartDirectory $source
+    $source  = $script:SOURCE_DIR
+    $name    = $script:BINARY_NAME
+    $aliases = @()
 
-    if (-not $moduleRoot) {
-        Write-Fail "Go module root not found for '$source'."
-        Write-Info 'Run lint inside a Go module or pass a path inside one.'
+    if ($RemainingArgs.Count -gt 0) { $source  = $RemainingArgs[0] }
+    if ($RemainingArgs.Count -gt 1) { $name    = $RemainingArgs[1] }
+    if ($RemainingArgs.Count -gt 2) { $aliases = $RemainingArgs[2..($RemainingArgs.Count - 1)] }
+
+    $source = Resolve-AbsolutePathValue -PathValue $source -BasePath $script:LAUNCH_DIR
+
+    $binName      = Get-BinName -Base $name
+    $buildContext = Resolve-BuildContext -Source $source -Name $name
+
+    if (-not $buildContext) {
+        Write-Fail "Build target not found for source '$source' and binary '$name'."
+        Write-Info "Expected one of: $source/main.go or $source/cmd/$name/main.go"
         exit 1
     }
 
-    Write-Info "Linting      $moduleRoot"
-    Write-Info 'Command      go tool golangci-lint run ./...'
+    $buildArtifact = Join-Path (Get-Location).Path $binName
 
-    Push-Location $moduleRoot
-    try {
-        & go tool golangci-lint run ./...
-        if ($LASTEXITCODE -ne 0) {
-            Write-Fail 'Lint failed.'
-            exit $LASTEXITCODE
-        }
-    } finally {
-        Pop-Location
+    Write-InfoDivider
+    Write-Info "Building     $binName"
+    Write-Info "Source       $source"
+    Write-Info "Target       $($buildContext.BuildTarget)"
+    Write-Info "Module Root  $($buildContext.ModuleRoot)"
+    Write-Info "Package Dir  $($buildContext.PackageDirectory)"
+    Write-Info "Destination  $script:INSTALL_DIR"
+    Write-InfoDivider
+
+    Invoke-GoBuild -ModuleRoot $buildContext.ModuleRoot -PackagePath $buildContext.PackagePath -OutputPath $buildArtifact
+    Write-Succ     "Built        $binName"
+
+    New-Item   -ItemType Directory -Path $script:INSTALL_DIR -Force | Out-Null
+    Move-Item  -LiteralPath $buildArtifact -Destination (Join-Path $script:INSTALL_DIR $binName) -Force
+    Write-Succ "Installed    $(Join-Path $script:INSTALL_DIR $binName)"
+
+    foreach ($aliasName in $aliases) {
+        $aliasBin = Get-BinName -Base $aliasName
+
+        Copy-Item  -LiteralPath (Join-Path $script:INSTALL_DIR $binName) -Destination (Join-Path $script:INSTALL_DIR $aliasBin) -Force
+        Write-Succ "Copy         $(Join-Path $script:INSTALL_DIR $aliasBin)  ->  $binName"
     }
 
-    Write-Succ 'Lint passed'
+    Add-InstallDirToPath -Directory $script:INSTALL_DIR
 }
 
-# Prints full usage information and examples.
-function Show-Usage {
-    @"
+# Handles 'uninstall' command.
+#
+# Arguments:
+#   RemainingArgs - Optional [name] [alias...]
+function Invoke-Uninstall {
+    param([string[]]$RemainingArgs)
 
-  Admiral CLI
+    $name    = $script:BINARY_NAME
+    $aliases = @()
 
-  Usage:
-    admiral [options] <command> [args]
+    if ($RemainingArgs.Count -gt 0) {
+        $name = $RemainingArgs[0]
 
-  Options:
-    -e, --env <path>                     Use custom dotenv file
+        if ($RemainingArgs.Count -gt 1) {
+            $aliases = $RemainingArgs[1..($RemainingArgs.Count - 1)]
+        }
+    }
 
-  Commands:
-    install   [path] [name] [alias...]   Build and install a CLI binary
-    build     [path] [name]              Build Linux/macOS/Windows binaries
-    lint      [path]                     Run 'golangci-lint' via go tool
-    uninstall [name] [alias...]          Remove an installed CLI binary
-    help                                 Show this help message
+    Remove-One -BaseName $name -Label 'binary'
+    foreach ($aliasName in $aliases) {
+        Remove-One -BaseName $aliasName -Label 'alias'
+    }
 
-  Examples:
-    ./admiral install                    Install standard CLI binary
-    ./admiral build                      Cross-build into ./build/
-    ./admiral lint                       Run linter from module root
-    ./admiral install . commodore cdr    Install with an alias
-    ./admiral install ./cmd commodore    Build from custom source root
-    ./admiral uninstall                  Uninstall standard CLI binary
-    ./admiral uninstall commodore cdr    Remove binary and alias
-
-  Environment:
-    INSTALL_DIR          Destination directory        (default: $INSTALL_DIR)
-    BUILD_DIR            Cross-build output directory (default: $BUILD_DIR)
-    DEFAULT_BINARY_NAME  Primary binary name          (default: $DEFAULT_BINARY_NAME)
-
-"@ | Write-Host
+    Remove-InstallDirFromPath -Directory $script:INSTALL_DIR
 }
 
 # ============================================================================ #
