@@ -1,26 +1,49 @@
 #!/usr/bin/env bash
 
 # ============================================================================ #
-# Admiral CLI                                                                  #
-#                                                                              #
+#                                 Admiral CLI                                  #
+# ============================================================================ #
+# Build and install tooling for Commodore CLI and projects built on top of the #
+# Commodore SDK. Supports cross-platform builds, binary installation, alias    #
+# linking, and automatic PATH management on Linux, macOS and Windows.          #
+# ============================================================================ #
 # Usage:                                                                       #
-#   admiral [options] <command> [command-args]                                 #
+#   admiral [command] [flags]                                                  #
 #                                                                              #
-# Options:                                                                     #
-#   -e, --env <path>                    Use custom dotenv file                 #
+# Global Flags:                                                                #
+#   -e, --env  <path>     Use custom dotenv file                               #
+#   -n, --name <name>     Binary name          (overrides ADMIRAL_BINARY_NAME) #
+#   -s, --src  <path>     Source path          (overrides ADMIRAL_SOURCE_DIR)  #
+#   -o, --out  <path>     Build output dir     (overrides ADMIRAL_BUILD_DIR)   #
+#   -d, --dir  <path>     Install directory    (overrides ADMIRAL_INSTALL_DIR) #
 #                                                                              #
 # Commands:                                                                    #
-#   help                                Show this help message                 #
-#   lint      [path]                    Run 'golangci-lint' via go tool        #
-#   build     [path] [name]             Build Cross-platform binaries          #
-#   install   [path] [name] [alias...]  Build and install a CLI binary         #
-#   uninstall [name] [alias...]         Remove an installed CLI binary         #
+#   help                  Show this help message                               #
+#                                                                              #
+#   lint                  Run 'golangci-lint' via go tool                      #
+#     -s, --src  <path>     Source path (module root)                          #
+#                                                                              #
+#   build                 Build cross-platform binaries                        #
+#     -n, --name <name>     Binary name                                        #
+#     -s, --src  <path>     Source path                                        #
+#     -o, --out  <path>     Build output directory                             #
+#                                                                              #
+#   install               Build and install a CLI binary                       #
+#     -n, --name  <name>    Binary name                                        #
+#     -s, --src   <path>    Source path                                        #
+#     -d, --dir   <path>    Install directory                                  #
+#     -a, --alias <name>    Alias (repeatable)                                 #
+#                                                                              #
+#   uninstall             Remove an installed CLI binary                       #
+#     -n, --name  <name>    Binary name                                        #
+#     -d, --dir   <path>    Install directory                                  #
+#     -a, --alias <name>    Alias (repeatable)                                 #
 #                                                                              #
 # Environment:                                                                 #
-#   ADMIRAL_BINARY_NAME  Primary binary name                                   #
-#   ADMIRAL_SOURCE_DIR   Default source path                                   #
-#   ADMIRAL_BUILD_DIR    Cross-build output directory                          #
-#   ADMIRAL_INSTALL_DIR  Destination directory                                 #
+#   ADMIRAL_BINARY_NAME   Primary binary name                                  #
+#   ADMIRAL_SOURCE_DIR    Default source path                                  #
+#   ADMIRAL_BUILD_DIR     Cross-build output directory                         #
+#   ADMIRAL_INSTALL_DIR   Destination directory                                #
 # ============================================================================ #
 
 set -euo pipefail
@@ -56,11 +79,20 @@ function _dotenv_source_file() {
 }
 
 # Loads runtime configuration from environment and dotenv files.
+# Flag overrides are applied last, after all env sources.
 #
 # Arguments:
 #   $1 - Optional custom .env file path.
+#   $2 - Optional binary name override (from --name flag).
+#   $3 - Optional source dir override  (from --src  flag).
+#   $4 - Optional build dir override   (from --out  flag).
+#   $5 - Optional install dir override (from --dir  flag).
 function _load_env_config() {
     local custom_env_file="${1:-}"
+    local flag_name="${2:-}"
+    local flag_src="${3:-}"
+    local flag_out="${4:-}"
+    local flag_dir="${5:-}"
 
     # 1) Built-in defaults
     local default_binary_name="commodore"
@@ -79,6 +111,12 @@ function _load_env_config() {
         custom_env_file="$(_abs_path "${custom_env_file}" "${_LAUNCH_DIR}")"
         _dotenv_source_file "${custom_env_file}"
     fi
+
+    # 5) Flag overrides (highest priority)
+    [[ -n "${flag_name}" ]] && ADMIRAL_BINARY_NAME="${flag_name}"
+    [[ -n "${flag_src}"  ]] && ADMIRAL_SOURCE_DIR="${flag_src}"
+    [[ -n "${flag_out}"  ]] && ADMIRAL_BUILD_DIR="${flag_out}"
+    [[ -n "${flag_dir}"  ]] && ADMIRAL_INSTALL_DIR="${flag_dir}"
 
     : "${ADMIRAL_BINARY_NAME:=${default_binary_name}}"
     : "${ADMIRAL_SOURCE_DIR:=${default_source_dir}}"
@@ -174,6 +212,67 @@ function _install_dir_on_path() {
 
     [[ ":$unix_path_full:" == *":$normalized:"* ]] && return 0
     return 1
+}
+
+# ============================================================================ #
+#                                Flag Parsing                                  #
+# ============================================================================ #
+
+# Parse a known set of flags from an argument list, populating named variables.
+# Unknown args are collected into the remainder array.
+#
+# Recognised flags (all optional):
+#   -n | --name  <value> -> _fp_name
+#   -s | --src   <value> -> _fp_src
+#   -o | --out   <value> -> _fp_out
+#   -d | --dir   <value> -> _fp_dir
+#   -a | --alias <value> -> _fp_aliases (array, repeatable)
+#
+# Note: caller must declare all _fp_* variables before calling this function.
+function _parse_flags() {
+    while (( $# > 0 )); do
+        case "$1" in
+            # Binary name
+            -n|--name)
+                [[ $# -ge 2 ]] || { fail "Missing value for $1"; exit 1; }
+                _fp_name="$2"; shift 2 ;;
+            --name=*)
+                _fp_name="${1#--name=}"; shift ;;
+            # Source path
+            -s|--src)
+                [[ $# -ge 2 ]] || { fail "Missing value for $1"; exit 1; }
+                _fp_src="$2"; shift 2 ;;
+            --src=*)
+                _fp_src="${1#--src=}"; shift ;;
+            # Build output path
+            -o|--out)
+                [[ $# -ge 2 ]] || { fail "Missing value for $1"; exit 1; }
+                _fp_out="$2"; shift 2 ;;
+            --out=*)
+                _fp_out="${1#--out=}"; shift ;;
+            # Install directory
+            -d|--dir)
+                [[ $# -ge 2 ]] || { fail "Missing value for $1"; exit 1; }
+                _fp_dir="$2"; shift 2 ;;
+            --dir=*)
+                _fp_dir="${1#--dir=}"; shift ;;
+            # Binary aliases (repeatable)
+            -a|--alias)
+                [[ $# -ge 2 ]] || { fail "Missing value for $1"; exit 1; }
+                _fp_aliases+=("$2"); shift 2 ;;
+            --alias=*)
+                _fp_aliases+=("${1#--alias=}"); shift ;;
+            # End of flags
+            --)
+                shift; _fp_rest+=("$@"); break ;;
+            # Unknown flag
+            -*)
+                fail "Unknown flag: $1"; exit 1 ;;
+            # Positional / rest
+            *)
+                _fp_rest+=("$1"); shift ;;
+        esac
+    done
 }
 
 # ============================================================================ #
@@ -311,7 +410,6 @@ function _detect_shell_profile() {
     local shell_path="${SHELL:-}"
     local shell_name
 
-    # If $SHELL is not set, try to detect the shell from the parent process.
     if [[ -z "$shell_path" ]]; then
         shell_name=$(ps -p $$ -o comm= | sed 's/^-//')
     else
@@ -418,7 +516,7 @@ function _package_path_from_root() {
 # 2) <src>/cmd/<name>/main.go (standard multi-command repository layout)
 #
 # Arguments:
-#   $1 - Source root/path from install command.
+#   $1 - Source root/path.
 #   $2 - Binary name.
 function _resolve_build_target() {
     local src="${1%/}"
@@ -439,7 +537,7 @@ function _resolve_build_target() {
 # Resolve the Go module root and package path to build.
 #
 # Arguments:
-#   $1 - Source root/path from install command.
+#   $1 - Source root/path.
 #   $2 - Binary name.
 function _resolve_build_context() {
     local src="$1"
@@ -469,17 +567,9 @@ function _resolve_build_context() {
     printf '%s|%s|%s|%s\n' "${build_target}" "${module_root}" "${package_dir}" "${package_path}"
 }
 
-# Resolves [path] [name] with defaults for CLI commands.
-#
-# Arguments:
-#   $1 - Optional source root/path (default: SOURCE_DIR)
-#   $2 - Optional binary name (default: BINARY_NAME)
-function _resolve_src_name() {
-    local src="${1:-${SOURCE_DIR}}"
-    src="$(_abs_path "${src:-./}" "${_LAUNCH_DIR}")"
-    local name="${2:-${BINARY_NAME}}"
-    printf '%s|%s\n' "${src}" "${name}"
-}
+# ============================================================================ #
+#                              Table Formatting                                #
+# ============================================================================ #
 
 # Format a table cell with fixed width and ellipsis truncation.
 #
@@ -515,10 +605,10 @@ function _repeat_char() {
 # Prints a table border for a set of column widths.
 #
 # Arguments:
-#   $1      - Left border symbol.
-#   $2      - Middle separator symbol.
-#   $3      - Right border symbol.
-#   $4..$N  - Column widths.
+#   $1     - Left border symbol.
+#   $2     - Middle separator symbol.
+#   $3     - Right border symbol.
+#   $4..$N - Column widths.
 function _table_border() {
     local left="$1"
     local mid="$2"
@@ -561,7 +651,6 @@ function _table_row() {
 }
 
 # Prints a decorative info divider line.
-# Uses a fixed width suitable for standard terminal output.
 function _info_divider() {
     info "$(_repeat_char 72 "─")"
 }
@@ -615,39 +704,62 @@ function _usage() {
   Admiral CLI
 
   Usage:
-    admiral [options] <command> [command-args]
+    admiral [command] [flags]
 
-  Options:
-    -e, --env <path>                    Use custom dotenv file
+  Global Flags:
+    -e, --env  <path>     Use custom dotenv file
+    -n, --name <name>     Binary name            (overrides ADMIRAL_BINARY_NAME)
+    -s, --src  <path>     Source path            (overrides ADMIRAL_SOURCE_DIR)
+    -o, --out  <path>     Build output dir       (overrides ADMIRAL_BUILD_DIR)
+    -d, --dir  <path>     Install directory      (overrides ADMIRAL_INSTALL_DIR)
 
   Commands:
-    help                                Show this help message
-    lint      [path]                    Run 'golangci-lint' via go tool
-    build     [path] [name]             Build Cross-platform binaries
-    install   [path] [name] [alias...]  Build and install a CLI binary
-    uninstall [name] [alias...]         Remove an installed CLI binary
+    help                  Show this help message
+
+    lint                  Run 'golangci-lint' via go tool
+      -s, --src  <path>     Source path (module root)
+
+    build                 Build cross-platform binaries
+      -n, --name <name>     Binary name
+      -s, --src  <path>     Source path
+      -o, --out  <path>     Build output directory
+
+    install               Build and install a CLI binary
+      -n, --name  <name>    Binary name
+      -s, --src   <path>    Source path
+      -d, --dir   <path>    Install directory
+      -a, --alias <name>    Alias (repeatable)
+
+    uninstall             Remove an installed CLI binary
+      -n, --name  <name>    Binary name
+      -d, --dir   <path>    Install directory
+      -a, --alias <name>    Alias (repeatable)
 
   Environment:
-    ADMIRAL_BINARY_NAME  Primary binary name          (default: ${ADMIRAL_BINARY_NAME})
-    ADMIRAL_SOURCE_DIR   Default source path          (default: ${ADMIRAL_SOURCE_DIR})
-    ADMIRAL_BUILD_DIR    Cross-build output directory (default: ${ADMIRAL_BUILD_DIR})
-    ADMIRAL_INSTALL_DIR  Destination directory        (default: ${ADMIRAL_INSTALL_DIR})
+    ADMIRAL_BINARY_NAME   Primary binary name          (default: ${ADMIRAL_BINARY_NAME})
+    ADMIRAL_SOURCE_DIR    Default source path          (default: ${ADMIRAL_SOURCE_DIR})
+    ADMIRAL_BUILD_DIR     Cross-build output directory (default: ${ADMIRAL_BUILD_DIR})
+    ADMIRAL_INSTALL_DIR   Destination directory        (default: ${ADMIRAL_INSTALL_DIR})
 
 EOF
 }
 
 # Run golangci-lint via `go tool` from module root.
 #
-# Arguments:
-#   $1 - Optional source root/path to resolve module root from.
+# Flags:
+#   -s, --src <path>   Source path to resolve module root from.
 function cmd_lint() {
-    local src="${1:-${SOURCE_DIR}}"
+    local _fp_name="" _fp_src="" _fp_out="" _fp_dir=""
+    local -a _fp_aliases=() _fp_rest=()
+    _parse_flags "$@"
+
+    local src="${_fp_src:-${SOURCE_DIR}}"
     src="$(_abs_path "${src:-./}" "${_LAUNCH_DIR}")"
 
     local module_root
     if ! module_root="$(_find_go_module_root "${src}")"; then
         fail "Go module root not found for '${src}'."
-        info "Run lint inside a Go module or pass a path inside one."
+        info "Run lint inside a Go module or pass a path with --src."
         exit 1
     fi
 
@@ -667,18 +779,22 @@ function cmd_lint() {
 
 # Build Go binaries for multiple OS targets into a dedicated output directory.
 #
-# Arguments:
-#   $1 - Optional source root/path.
-#   $2 - Optional primary binary name.
+# Flags:
+#   -n, --name <name>   Binary name.
+#   -s, --src  <path>   Source path.
+#   -o, --out  <path>   Build output directory.
 function cmd_build() {
-    local src name
-    local parsed
-    parsed="$(_resolve_src_name "${1:-}" "${2:-}")"
-    IFS='|' read -r src name <<< "${parsed}"
+    local _fp_name="" _fp_src="" _fp_out="" _fp_dir=""
+    local -a _fp_aliases=() _fp_rest=()
+    _parse_flags "$@"
+
+    local name="${_fp_name:-${BINARY_NAME}}"
+    local src="${_fp_src:-${SOURCE_DIR}}"
+    src="$(_abs_path "${src:-./}" "${_LAUNCH_DIR}")"
 
     local build_context
     if ! build_context="$(_resolve_build_context "${src}" "${name}")"; then
-        fail "Build target not found for source '${src}' and binary '${name}'."
+        fail "Build target not found for --src '${src}' and --name '${name}'."
         info "Expected one of: ${src}/main.go or ${src}/cmd/${name}/main.go"
         exit 1
     fi
@@ -686,7 +802,8 @@ function cmd_build() {
     local build_target module_root package_dir package_path
     IFS='|' read -r build_target module_root package_dir package_path <<< "${build_context}"
 
-    local output_dir="${BUILD_DIR:-$(pwd -P)/build}"
+    local output_dir="${_fp_out:-${BUILD_DIR}}"
+    output_dir="$(_abs_path "${output_dir:-./build}" "${_LAUNCH_DIR}")"
 
     mkdir -p "${output_dir}"
     output_dir="$(_abs_dir "${output_dir}")"
@@ -777,28 +894,29 @@ function cmd_build() {
 
 # Build a Go binary and install it, creating symlinks/hardlinks for aliases.
 #
-# Arguments:
-#   $1        Path to the Go package directory
-#   $2        Primary binary name
-#   $3 ..$N   Optional alias names
+# Flags:
+#   -n, --name  <name>   Binary name.
+#   -s, --src   <path>   Source path.
+#   -d, --dir   <path>   Install directory.
+#   -a, --alias <name>   Alias (repeatable).
 function cmd_install() {
-    local src name
-    local parsed
-    parsed="$(_resolve_src_name "${1:-}" "${2:-}")"
-    IFS='|' read -r src name <<< "${parsed}"
+    local _fp_name="" _fp_src="" _fp_out="" _fp_dir=""
+    local -a _fp_aliases=() _fp_rest=()
+    _parse_flags "$@"
 
-    if [[ $# -ge 2 ]]; then
-        shift 2
-    elif [[ $# -eq 1 ]]; then
-        shift 1
-    fi
+    local name="${_fp_name:-${BINARY_NAME}}"
+    local src="${_fp_src:-${SOURCE_DIR}}"
+    src="$(_abs_path "${src:-./}" "${_LAUNCH_DIR}")"
+
+    local install_dir="${_fp_dir:-${INSTALL_DIR}}"
+    install_dir="$(_abs_path "${install_dir}" "${_LAUNCH_DIR}")"
 
     local bin_name
     bin_name="$(_bin_name "${name}")"
 
     local build_context
     if ! build_context="$(_resolve_build_context "${src}" "${name}")"; then
-        fail "Build target not found for source '${src}' and binary '${name}'."
+        fail "Build target not found for --src '${src}' and --name '${name}'."
         info "Expected one of: ${src}/main.go or ${src}/cmd/${name}/main.go"
         exit 1
     fi
@@ -815,7 +933,7 @@ function cmd_install() {
     info "Target       ${build_target}"
     info "Module Root  ${module_root}"
     info "Package Dir  ${package_dir}"
-    info "Destination  ${INSTALL_DIR}"
+    info "Destination  ${install_dir}"
     _info_divider
 
     if ! (
@@ -827,45 +945,51 @@ function cmd_install() {
     fi
     succ "Built        ${bin_name}"
 
-    mkdir -p "${INSTALL_DIR}"
-    mv "${build_artifact}" "${INSTALL_DIR}/${bin_name}"
-    succ "Installed    ${INSTALL_DIR}/${bin_name}"
+    mkdir -p "${install_dir}"
+    mv "${build_artifact}" "${install_dir}/${bin_name}"
+    succ "Installed    ${install_dir}/${bin_name}"
 
-    for alias_name in "$@"; do
+    for alias_name in "${_fp_aliases[@]+"${_fp_aliases[@]}"}"; do
         local alias_bin
         alias_bin="$(_bin_name "${alias_name}")"
         if _is_windows_runtime; then
-            cp "${INSTALL_DIR}/${bin_name}" "${INSTALL_DIR}/${alias_bin}"
-            succ "Copy         ${INSTALL_DIR}/${alias_bin}  ->  ${bin_name}"
+            cp "${install_dir}/${bin_name}" "${install_dir}/${alias_bin}"
+            succ "Copy         ${install_dir}/${alias_bin}  ->  ${bin_name}"
         else
-            ln -sf "${bin_name}" "${INSTALL_DIR}/${alias_bin}"
-            succ "Symlink      ${INSTALL_DIR}/${alias_bin}  ->  ${bin_name}"
+            ln -sf "${bin_name}" "${install_dir}/${alias_bin}"
+            succ "Symlink      ${install_dir}/${alias_bin}  ->  ${bin_name}"
         fi
     done
 
-    _ensure_on_path "${INSTALL_DIR}"
+    _ensure_on_path "${install_dir}"
 }
 
 # Remove an installed binary and any symlink/copy aliases.
-# On Windows the .exe suffix is appended automatically.
 #
-# Arguments:
-#   $1        Primary binary name to remove
-#   $2 ..$N   Optional alias names to remove
+# Flags:
+#   -n, --name  <name>   Binary name.
+#   -d, --dir   <path>   Install directory.
+#   -a, --alias <name>   Alias (repeatable).
 function cmd_uninstall() {
-    local name="${BINARY_NAME}"
-    if [[ $# -gt 0 ]]; then
-        name="$1"
-        shift 1
-    fi
+    local _fp_name="" _fp_src="" _fp_out="" _fp_dir=""
+    local -a _fp_aliases=() _fp_rest=()
+    _parse_flags "$@"
+
+    local name="${_fp_name:-${BINARY_NAME}}"
+    local install_dir="${_fp_dir:-${INSTALL_DIR}}"
+    install_dir="$(_abs_path "${install_dir}" "${_LAUNCH_DIR}")"
+
+    # Temporarily override INSTALL_DIR so _remove_one and _remove_from_path
+    # operate on the correct directory when --dir was passed.
+    INSTALL_DIR="${install_dir}"
 
     _remove_one "${name}" "binary"
 
-    for alias_name in "$@"; do
+    for alias_name in "${_fp_aliases[@]+"${_fp_aliases[@]}"}"; do
         _remove_one "${alias_name}" "alias"
     done
 
-    _remove_from_path "${INSTALL_DIR}"
+    _remove_from_path "${install_dir}"
 }
 
 # ============================================================================ #
@@ -873,26 +997,47 @@ function cmd_uninstall() {
 # ============================================================================ #
 
 function main() {
-    local custom_env_file=""
+    local g_env_file=""
+    local g_name="" g_src="" g_out="" g_dir=""
 
     while (( $# > 0 )); do
         case "$1" in
             -e|--env)
                 [[ $# -ge 2 ]] || { fail "Missing value for $1"; exit 1; }
-                custom_env_file="$2"
-                shift 2
-                ;;
+                g_env_file="$2"; shift 2 ;;
             --env=*)
-                custom_env_file="${1#--env=}"
-                shift
-                ;;
+                g_env_file="${1#--env=}"; shift ;;
+
+            -n|--name)
+                [[ $# -ge 2 ]] || { fail "Missing value for $1"; exit 1; }
+                g_name="$2"; shift 2 ;;
+            --name=*)
+                g_name="${1#--name=}"; shift ;;
+
+            -s|--src)
+                [[ $# -ge 2 ]] || { fail "Missing value for $1"; exit 1; }
+                g_src="$2"; shift 2 ;;
+            --src=*)
+                g_src="${1#--src=}"; shift ;;
+
+            -o|--out)
+                [[ $# -ge 2 ]] || { fail "Missing value for $1"; exit 1; }
+                g_out="$2"; shift 2 ;;
+            --out=*)
+                g_out="${1#--out=}"; shift ;;
+
+            -d|--dir)
+                [[ $# -ge 2 ]] || { fail "Missing value for $1"; exit 1; }
+                g_dir="$2"; shift 2 ;;
+            --dir=*)
+                g_dir="${1#--dir=}"; shift ;;
+
             *)
-                break
-                ;;
+                break ;;
         esac
     done
 
-    _load_env_config "${custom_env_file}"
+    _load_env_config "${g_env_file}" "${g_name}" "${g_src}" "${g_out}" "${g_dir}"
 
     case "${1:-}" in
         install)   shift; cmd_install   "$@" ;;

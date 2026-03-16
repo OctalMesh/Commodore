@@ -56,7 +56,7 @@ reactor:
 #                                Fleet Manifest                                #
 # ============================================================================ #
 # The Manifest defines the hierarchy. Every path leads to another config.      #
-# No explicit roles needed here—each subordinate declares itself.              #
+# No explicit roles needed here, each subordinate declares itself.             #
 # ============================================================================ #
 
 manifest:
