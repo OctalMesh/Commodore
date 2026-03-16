@@ -1236,3 +1236,7 @@ if ($Arguments) {
 }
 
 Main -CliArgs $entryArgs.ToArray()
+
+if ($MyInvocation.InvocationName -eq '&' -or [string]::IsNullOrWhiteSpace($MyInvocation.InvocationName)) {
+    Read-Host "`nPress Enter to exit"
+}
