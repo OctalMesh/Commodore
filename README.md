@@ -101,6 +101,19 @@
 </div>
 
 <div align="center">
+  <!--
+  =====================
+        ACTIVITY
+  =====================
+  -->
+  <br />
+  <a rel="noopener noreferrer" href="https://github.com/OctalMesh/Commodore/pulse">
+    <img alt="Commodore activity" src="https://repobeats.axiom.co/api/embed/9b96791d85072cf15ed1393839497abb8a793b6f.svg" width="98%" />
+  </a>
+  <br /><br />
+</div>
+
+<div align="center">
   <h2>Overview</h2>
 </div>
 
@@ -866,19 +879,6 @@ configurations:
 |------------------------------------------------------|-----------------------------------------------------------------|
 | [`examples/configuration/`](examples/configuration/) | Full squadron + unit YAML templates with every field documented |
 | [`examples/sdk/`](examples/sdk/)                     | Minimal Go binary built with the Commodore SDK                  |
-
-<div align="center">
-  <!--
-  =====================
-        ACTIVITY
-  =====================
-  -->
-  <h1>Activity</h1>
-  <a rel="noopener noreferrer" href="https://github.com/OctalMesh/Commodore/pulse">
-    <img alt="Commodore activity" src="https://repobeats.axiom.co/api/embed/9b96791d85072cf15ed1393839497abb8a793b6f.svg" width="98%" />
-  </a>
-  <br /><br />
-</div>
 
 <div align="center">
   <!--

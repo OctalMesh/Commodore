@@ -1,6 +1,22 @@
 <!--suppress HtmlDeprecatedAttribute -->
 <h1 align="center">Contributor Covenant Code of Conduct</h1>
 
+<div align="center">
+  <h6>
+    <a rel="noopener noreferrer" href="README.md">Readme</a>
+    ·
+    <a rel="noopener noreferrer" href="CONTRIBUTING.md">Contributing</a>
+    ·
+    <a rel="noopener noreferrer" href="SECURITY.md">Security Policy</a>
+    ·
+    <a rel="noopener noreferrer" href="SUPPORT.md">Support</a>
+    ·
+    <a rel="noopener noreferrer" href="LICENSE.md">License</a>
+  </h6>
+</div>
+
+<h1></h1>
+
 ## Our Pledge
 
 We as members, contributors, and leaders pledge to make participation in our
