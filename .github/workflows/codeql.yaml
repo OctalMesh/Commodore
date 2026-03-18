@@ -1,4 +1,4 @@
-name: "CodeQL Analysis"
+name: "CodeQL"
 
 on:
   workflow_dispatch:
@@ -32,8 +32,9 @@ jobs:
   analyze:
     needs: check
     if: needs.check.outputs.should_skip != 'true'
-    name: "CodeQL Analyze"
+    name: "CodeQL Analysis"
     runs-on: ubuntu-latest
+
     permissions:
       actions: read
       contents: read

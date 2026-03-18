@@ -1,0 +1,71 @@
+name: "Test"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["dev", "release"]
+  pull_request:
+    branches: ["dev", "release"]
+
+permissions:
+  contents: read
+
+jobs:
+  # Check if the commit message contains [test-skip] to avoid unnecessary runs
+  check:
+    name: "Skip Check"
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        run: |
+          if [[ "${{ github.event.head_commit.message }}" == *"[test-skip]"* ]]; then
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Perform Go tests
+  test:
+    needs: check
+    if: needs.check.outputs.should_skip != 'true'
+    name: "Go Test (${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: "Set up Go"
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: "Download dependencies"
+        run: |
+          go mod download
+          go mod verify
+
+      - name: "Build"
+        run: go build -v ./...
+
+      - name: "Run tests"
+        run: go test -v -coverprofile=coverage.out ./...
+
+      - name: "Upload coverage"
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ matrix.os }}
+          path: coverage.out
+          retention-days: 7
