@@ -1,4 +1,4 @@
-name: "Test Analysis"
+name: "Test"
 
 on:
   workflow_dispatch:
