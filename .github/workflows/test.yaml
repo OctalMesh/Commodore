@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  # Check if the commit message contains [test-skip] to avoid unnecessary runs
+  # Check if the commit message contains skip tags
   check:
     name: "Skip Check"
     runs-on: ubuntu-latest
@@ -20,7 +20,9 @@ jobs:
     steps:
       - id: skip_check
         run: |
-          if [[ "${{ github.event.head_commit.message }}" == *"[test-skip]"* ]]; then
+          message="${{ github.event.head_commit.message }}"
+          if [[ "$message" == *"[ci-skip]"* ]] || \
+             [[ "$message" == *"[test-skip]"* ]]; then
             echo "should_skip=true" >> $GITHUB_OUTPUT
           else
             echo "should_skip=false" >> $GITHUB_OUTPUT

@@ -1,4 +1,4 @@
-# .golangci.yml - OctalMesh Commodore code-quality standard
+# .golangci.yaml - OctalMesh Commodore code-quality standard
 # Enforced on every commit; golangci-lint v1.64+
 run:
   timeout: 3m

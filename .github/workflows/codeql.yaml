@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  # Check if the commit message contains [ql-skip] to avoid unnecessary runs
+  # Check if the commit message contains skip tags
   check:
     name: "Skip Check"
     runs-on: ubuntu-latest
@@ -22,7 +22,9 @@ jobs:
     steps:
       - id: skip_check
         run: |
-          if [[ "${{ github.event.head_commit.message }}" == *"[ql-skip]"* ]]; then
+          message="${{ github.event.head_commit.message }}"
+          if [[ "$message" == *"[ci-skip]"* ]] || \
+             [[ "$message" == *"[ql-skip]"* ]]; then
             echo "should_skip=true" >> $GITHUB_OUTPUT
           else
             echo "should_skip=false" >> $GITHUB_OUTPUT
@@ -63,7 +65,7 @@ jobs:
       - name: "Initialize CodeQL"
         uses: github/codeql-action/init@v4
         with:
-          config-file: "./.github/codeql/codeql-config.yml"
+          config-file: "./.github/codeql/codeql-config.yaml"
           languages: "${{ matrix.language }}"
           build-mode: "${{ matrix.build-mode }}"
 
