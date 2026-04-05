@@ -270,9 +270,12 @@ Windows (PowerShell):
   <h2>Configuration</h2>
 </div>
 
-Commodore discovers configuration by looking for `.commodore[.yaml|.yml]`
-in the working directory. A project hierarchy is built by
-nesting squadron configs that reference subordinate paths.
+Commodore discovers configuration by looking for `.commodore[.yaml|.yml]` in the
+working directory. A project hierarchy is built by nesting squadron configs that
+reference subordinate paths.
+
+For units started directly from their own directory (standalone mode), Commodore
+first tries `reactor.standalone.*` and then falls back to `reactor.*`.
 
 ### Squadron
 
@@ -488,6 +491,19 @@ reactor:
         - LOG_LEVEL=INFO
         - SOME_VAR=some_other_value
 
+  # Optional: standalone overrides for direct unit execution.
+  # When this unit is run directly (for example `commodore up` in this folder),
+  # blueprints/environments below are checked first, then fallback to defaults.
+  standalone:
+    blueprints:
+      - env: dev
+        path: ./standalone/dev/Tiltfile
+
+    environments:
+      - name: dev
+        variables:
+          - LOG_LEVEL=TRACE
+
 # ============================================================================ #
 #                                  Maneuvers                                   #
 # ============================================================================ #
@@ -524,11 +540,25 @@ maneuvers:
 | `reactor.environments[].name`      | `string`   | ✔        | Environment name                                       |
 | `reactor.environments[].files`     | `[]string` | -        | `.env` files to load                                   |
 | `reactor.environments[].variables` | `[]string` | -        | Inline `KEY=VALUE` pairs                               |
+| `reactor.standalone.blueprints`    | `[]object` | -        | Unit-only standalone blueprint list (checked first)    |
+| `reactor.standalone.environments`  | `[]object` | -        | Unit-only environment overrides (higher precedence)    |
 | `maneuvers[].call`                 | `string`   | ✔        | CLI subcommand name                                    |
 | `maneuvers[].description`          | `string`   | -        | Help text                                              |
 | `maneuvers[].action`               | `[]string` | ✔        | Command to execute                                     |
 
 </details>
+
+### Standalone Unit Mode
+
+When a unit is launched directly from its own folder (for example, `commodore up`
+inside a unit directory), Commodore applies the following resolution rules:
+
+1. Blueprint selection: `reactor.standalone.blueprints` first, then fallback to
+   `reactor.blueprints`.
+2. Environment merge: base `reactor.environments` plus
+   `reactor.standalone.environments` with standalone keys overriding base keys.
+3. Backward compatibility: if `reactor.standalone` is missing, behavior is
+   unchanged.
 
 ### Environment Variable Cascading
 

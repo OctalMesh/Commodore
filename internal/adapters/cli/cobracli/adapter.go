@@ -35,7 +35,7 @@ func NewAdapter(binary string, version string, runtime *coreruntime.Service) *Ad
 		SilenceUsage:  true,
 	}
 
-	adapter.root.PersistentFlags().StringVarP(&adapter.environment, "env", "e", "dev", "Execution environment name (dev, staging, ...)")
+	adapter.root.PersistentFlags().StringVarP(&adapter.environment, "env", "e", "dev", "Execution environment name (dev, staging, ...). For standalone unit runs, reactor.standalone takes precedence")
 	adapter.root.PersistentFlags().StringVarP(&adapter.configPath, "config", "c", "", "Path to Commodore configuration file")
 	adapter.root.PersistentFlags().StringSliceVarP(&adapter.tags, "tags", "t", nil, "Filter operations by tags")
 

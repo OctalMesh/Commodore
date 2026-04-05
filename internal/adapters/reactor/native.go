@@ -27,10 +27,12 @@ func (reactor *NativeReactor) StartNode(
 	environmentName string,
 	effectiveEnvironment domain.EnvironmentDefinition,
 ) error {
-	action, workingDirectory, errorValue := resolveNativeAction(node, environmentName)
+	action, workingDirectory, blueprintSource, errorValue := resolveNativeAction(node, environmentName)
 	if errorValue != nil {
 		return errorValue
 	}
+
+	_, _ = fmt.Fprintf(os.Stdout, "  info: selected %s reactor blueprint for node %q (env=%s)\n", blueprintSource, node.GetID(), environmentName)
 
 	environmentVariables, errorValue := buildEnvironmentVariables(workingDirectory, effectiveEnvironment)
 	if errorValue != nil {
@@ -99,24 +101,41 @@ func (reactor *NativeReactor) RouteSignalToSubordinate(
 	return nil, &ports.ReactorExecutionError{Message: "native reactor does not route signals directly"}
 }
 
-func resolveNativeAction(node domain.OrchestrationNode, environmentName string) ([]string, string, error) {
+func resolveNativeAction(node domain.OrchestrationNode, environmentName string) ([]string, string, domain.BlueprintSelectionSource, error) {
 	unitNode, ok := node.(*domain.UnitNode)
 	if !ok {
-		return nil, "", &ports.ReactorExecutionError{Message: fmt.Sprintf("node %q is not a unit for native execution", node.GetID())}
+		return nil, "", domain.BlueprintSelectionSourceDefault, &ports.ReactorExecutionError{Message: fmt.Sprintf("node %q is not a unit for native execution", node.GetID())}
 	}
 
 	workingDirectory := unitNode.Path
-	for _, blueprint := range unitNode.Reactor.Blueprints {
-		if blueprint.EnvironmentName != environmentName {
+	primaryBlueprints, fallbackBlueprints, primarySource := unitNode.ResolveBlueprintListsForExecution()
+
+	action, found := findNativeBlueprintAction(primaryBlueprints, environmentName)
+	if found {
+		return action, workingDirectory, primarySource, nil
+	}
+
+	action, found = findNativeBlueprintAction(fallbackBlueprints, environmentName)
+	if found {
+		return action, workingDirectory, domain.BlueprintSelectionSourceDefault, nil
+	}
+
+	return nil, "", domain.BlueprintSelectionSourceDefault, &ports.ReactorExecutionError{Message: fmt.Sprintf("native blueprint for env %q is missing action in node %q", environmentName, node.GetID())}
+}
+
+func findNativeBlueprintAction(
+	blueprints []domain.ReactorBlueprint,
+	environmentName string,
+) ([]string, bool) {
+	for _, blueprint := range blueprints {
+		if blueprint.EnvironmentName != environmentName || len(blueprint.Action) == 0 {
 			continue
 		}
 
-		if len(blueprint.Action) > 0 {
-			return append([]string(nil), blueprint.Action...), workingDirectory, nil
-		}
+		return append([]string(nil), blueprint.Action...), true
 	}
 
-	return nil, "", &ports.ReactorExecutionError{Message: fmt.Sprintf("native blueprint for env %q is missing action in node %q", environmentName, node.GetID())}
+	return nil, false
 }
 
 func buildEnvironmentVariables(workingDirectory string, effectiveEnvironment domain.EnvironmentDefinition) ([]string, error) {

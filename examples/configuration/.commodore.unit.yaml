@@ -53,6 +53,19 @@ reactor:
         - LOG_LEVEL=INFO
         - SOME_VAR=some_other_value
 
+  # Optional: standalone overrides for direct unit execution.
+  # When this unit is run directly (for example `commodore up` in this folder),
+  # blueprints/environments below are checked first, then fallback to defaults.
+  standalone:
+    blueprints:
+      - env: dev
+        path: ./standalone/dev/Tiltfile
+
+    environments:
+      - name: dev
+        variables:
+          - LOG_LEVEL=TRACE
+
 # ============================================================================ #
 #                                  Maneuvers                                   #
 # ============================================================================ #

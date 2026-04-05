@@ -82,6 +82,7 @@ Key concepts demonstrated:
 | `role: unit` declaration                          | Top of file            |
 | Tilt blueprint + native `action:` blueprint       | `reactor.blueprints`   |
 | Per-unit environment variables and `.env` loading | `reactor.environments` |
+| Standalone-first unit overrides                   | `reactor.standalone`   |
 | Multiple maneuvers (`deploy`, `lint`, `test`)     | `maneuvers`            |
 
 ```bash
@@ -92,6 +93,11 @@ cp examples/configuration/.commodore.unit.yaml ./services/my-service/.commodore.
 > [!IMPORTANT]
 > The `id:` in a unit config **must match** the `id:` declared for that
 > subordinate in the parent squadron's `manifest`.
+
+> [!NOTE]
+> Standalone mode applies when a unit is started directly from its own
+> directory. Resolution order is: `reactor.standalone` first, then fallback to
+> `reactor` defaults.
 
 <div align="center">
   <h2>Common Patterns</h2>

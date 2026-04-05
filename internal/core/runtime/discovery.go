@@ -75,7 +75,13 @@ func (service *Service) buildRuntimeTree(
 	case domain.NodeRoleSquadron:
 		node = &domain.SquadronNode{ID: resolvedNodeID, Path: configurationDirectory, Reactor: configuration.Reactor, Maneuvers: append([]domain.ManeuverDefinition(nil), configuration.Maneuvers...)}
 	case domain.NodeRoleUnit:
-		node = &domain.UnitNode{ID: resolvedNodeID, Path: configurationDirectory, Reactor: configuration.Reactor, Maneuvers: append([]domain.ManeuverDefinition(nil), configuration.Maneuvers...)}
+		node = &domain.UnitNode{
+			ID:                  resolvedNodeID,
+			Path:                configurationDirectory,
+			Reactor:             configuration.Reactor,
+			Maneuvers:           append([]domain.ManeuverDefinition(nil), configuration.Maneuvers...),
+			StandaloneExecution: reference == nil,
+		}
 	default:
 		return nil, nil, &domain.ValidationError{Message: fmt.Sprintf("unsupported node role %q in %s", configuration.Role, absoluteConfigurationPath)}
 	}

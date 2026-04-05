@@ -14,6 +14,9 @@ func Up() Spec {
 Launches an interactive TUI: spinner during environment checks, then
 streams Tilt output into a scrollable viewport with a live status bar.
 
+If the current configuration is a root unit (standalone execution),
+reactor.standalone blueprints/environments are resolved before reactor defaults.
+
 Key bindings while running:
   space      open Tilt browser UI (http://localhost:10350)
   t          switch to legacy terminal mode (full Tilt TUI)

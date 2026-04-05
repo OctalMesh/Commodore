@@ -26,10 +26,12 @@ func (reactor *TiltReactor) StartNode(
 	effectiveEnvironment domain.EnvironmentDefinition,
 ) error {
 	_ = effectiveEnvironment
-	tiltfilePath, workingDirectory, errorValue := resolveTiltBlueprint(node, environmentName)
+	tiltfilePath, workingDirectory, blueprintSource, errorValue := resolveTiltBlueprint(node, environmentName)
 	if errorValue != nil {
 		return errorValue
 	}
+
+	_, _ = fmt.Fprintf(os.Stdout, "  info: selected %s reactor blueprint for node %q (env=%s)\n", blueprintSource, node.GetID(), environmentName)
 
 	command := exec.CommandContext(executionContext, "tilt", "ci", "--file", tiltfilePath)
 	command.Dir = workingDirectory
@@ -52,7 +54,7 @@ func (reactor *TiltReactor) StopNode(
 	node domain.OrchestrationNode,
 	environmentName string,
 ) error {
-	tiltfilePath, workingDirectory, errorValue := resolveTiltBlueprint(node, environmentName)
+	tiltfilePath, workingDirectory, _, errorValue := resolveTiltBlueprint(node, environmentName)
 	if errorValue != nil {
 		return errorValue
 	}
@@ -110,27 +112,49 @@ func (reactor *TiltReactor) RouteSignalToSubordinate(
 // ResolveTiltfilePath implements ports.TiltfileProvider so the fleet
 // orchestrator can collect tiltfile paths to build a combined Tiltfile.
 func (reactor *TiltReactor) ResolveTiltfilePath(node domain.OrchestrationNode, environmentName string) (string, string, error) {
-	return resolveTiltBlueprint(node, environmentName)
-}
-
-func resolveTiltBlueprint(node domain.OrchestrationNode, environmentName string) (string, string, error) {
-	workingDirectory := node.GetPath()
-
-	var reactorConfiguration domain.ReactorDefinition
-	switch typedNode := node.(type) {
-	case *domain.SquadronNode:
-		reactorConfiguration = typedNode.Reactor
-	case *domain.UnitNode:
-		reactorConfiguration = typedNode.Reactor
-	default:
-		return "", "", &ports.ReactorExecutionError{Message: fmt.Sprintf("node %q does not support tilt blueprints", node.GetID())}
+	tiltfilePath, workingDirectory, _, errorValue := resolveTiltBlueprint(node, environmentName)
+	if errorValue != nil {
+		return "", "", errorValue
 	}
 
-	for _, blueprint := range reactorConfiguration.Blueprints {
-		if blueprint.EnvironmentName != environmentName {
-			continue
+	return tiltfilePath, workingDirectory, nil
+}
+
+func resolveTiltBlueprint(node domain.OrchestrationNode, environmentName string) (string, string, domain.BlueprintSelectionSource, error) {
+	workingDirectory := node.GetPath()
+
+	switch typedNode := node.(type) {
+	case *domain.SquadronNode:
+		tiltfilePath, found := findTiltBlueprintPath(typedNode.Reactor.Blueprints, environmentName, workingDirectory)
+		if found {
+			return tiltfilePath, workingDirectory, domain.BlueprintSelectionSourceDefault, nil
 		}
-		if blueprint.Path == "" {
+	case *domain.UnitNode:
+		primaryBlueprints, fallbackBlueprints, primarySource := typedNode.ResolveBlueprintListsForExecution()
+
+		tiltfilePath, found := findTiltBlueprintPath(primaryBlueprints, environmentName, workingDirectory)
+		if found {
+			return tiltfilePath, workingDirectory, primarySource, nil
+		}
+
+		tiltfilePath, found = findTiltBlueprintPath(fallbackBlueprints, environmentName, workingDirectory)
+		if found {
+			return tiltfilePath, workingDirectory, domain.BlueprintSelectionSourceDefault, nil
+		}
+	default:
+		return "", "", domain.BlueprintSelectionSourceDefault, &ports.ReactorExecutionError{Message: fmt.Sprintf("node %q does not support tilt blueprints", node.GetID())}
+	}
+
+	return "", "", domain.BlueprintSelectionSourceDefault, &ports.ReactorExecutionError{Message: fmt.Sprintf("tilt blueprint for env %q is missing path in node %q", environmentName, node.GetID())}
+}
+
+func findTiltBlueprintPath(
+	blueprints []domain.ReactorBlueprint,
+	environmentName string,
+	workingDirectory string,
+) (string, bool) {
+	for _, blueprint := range blueprints {
+		if blueprint.EnvironmentName != environmentName || blueprint.Path == "" {
 			continue
 		}
 
@@ -138,8 +162,9 @@ func resolveTiltBlueprint(node domain.OrchestrationNode, environmentName string)
 		if !filepath.IsAbs(tiltfilePath) {
 			tiltfilePath = filepath.Join(workingDirectory, blueprint.Path)
 		}
-		return tiltfilePath, workingDirectory, nil
+
+		return tiltfilePath, true
 	}
 
-	return "", "", &ports.ReactorExecutionError{Message: fmt.Sprintf("tilt blueprint for env %q is missing path in node %q", environmentName, node.GetID())}
+	return "", false
 }

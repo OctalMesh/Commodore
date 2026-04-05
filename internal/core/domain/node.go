@@ -143,14 +143,29 @@ type EnvironmentDefinition struct {
 	Variables []string `yaml:"variables"`
 }
 
+// ReactorStandaloneDefinition overrides base reactor settings for standalone unit runs.
+type ReactorStandaloneDefinition struct {
+	Blueprints   []ReactorBlueprint      `yaml:"blueprints,omitempty"`
+	Environments []EnvironmentDefinition `yaml:"environments,omitempty"`
+}
+
 // ReactorDefinition configures node runtime behavior.
 type ReactorDefinition struct {
-	Provider     ReactorProvider         `yaml:"provider"`
-	Network      string                  `yaml:"network"`
-	ContextPath  string                  `yaml:"context"`
-	Blueprints   []ReactorBlueprint      `yaml:"blueprints"`
-	Environments []EnvironmentDefinition `yaml:"environments"`
+	Provider     ReactorProvider             `yaml:"provider"`
+	Network      string                      `yaml:"network"`
+	ContextPath  string                      `yaml:"context"`
+	Blueprints   []ReactorBlueprint          `yaml:"blueprints"`
+	Environments []EnvironmentDefinition     `yaml:"environments"`
+	Standalone   ReactorStandaloneDefinition `yaml:"standalone,omitempty"`
 }
+
+// BlueprintSelectionSource describes which reactor blueprint section was selected.
+type BlueprintSelectionSource string
+
+const (
+	BlueprintSelectionSourceDefault    BlueprintSelectionSource = "default"
+	BlueprintSelectionSourceStandalone BlueprintSelectionSource = "standalone"
+)
 
 // HealthCheckDefinition defines subordinate readiness checks.
 type HealthCheckDefinition struct {
@@ -209,12 +224,13 @@ type SquadronNode struct {
 
 // UnitNode models a leaf execution node.
 type UnitNode struct {
-	ID        string
-	Path      string
-	Tags      []string
-	After     []string
-	Reactor   ReactorDefinition
-	Maneuvers []ManeuverDefinition
+	ID                  string
+	Path                string
+	Tags                []string
+	After               []string
+	Reactor             ReactorDefinition
+	Maneuvers           []ManeuverDefinition
+	StandaloneExecution bool
 }
 
 func (squadron *SquadronNode) GetID() string { return squadron.ID }
@@ -290,7 +306,44 @@ func (unit *UnitNode) BuildEffectiveEnvironmentByName(
 	environmentName string,
 	parentEnvironment EnvironmentDefinition,
 ) (EnvironmentDefinition, error) {
-	return buildEffectiveEnvironmentByName(environmentName, parentEnvironment, unit.Reactor.Environments)
+	localEnvironments := unit.Reactor.Environments
+	if unit.RunsStandalone() {
+		mergedEnvironments, errorValue := mergeEnvironmentDefinitionsByName(
+			unit.Reactor.Environments,
+			unit.Reactor.Standalone.Environments,
+		)
+		if errorValue != nil {
+			return EnvironmentDefinition{}, errorValue
+		}
+		localEnvironments = mergedEnvironments
+	}
+
+	return buildEffectiveEnvironmentByName(environmentName, parentEnvironment, localEnvironments)
+}
+
+// RunsStandalone reports whether the unit is executed as the runtime root.
+func (unit *UnitNode) RunsStandalone() bool {
+	if unit == nil {
+		return false
+	}
+	return unit.StandaloneExecution
+}
+
+// ResolveBlueprintListsForExecution returns prioritized blueprint sources.
+func (unit *UnitNode) ResolveBlueprintListsForExecution() (
+	primary []ReactorBlueprint,
+	fallback []ReactorBlueprint,
+	primarySource BlueprintSelectionSource,
+) {
+	if unit != nil && unit.RunsStandalone() {
+		return unit.Reactor.Standalone.Blueprints, unit.Reactor.Blueprints, BlueprintSelectionSourceStandalone
+	}
+
+	if unit == nil {
+		return nil, nil, BlueprintSelectionSourceDefault
+	}
+
+	return unit.Reactor.Blueprints, nil, BlueprintSelectionSourceDefault
 }
 
 func (unit *UnitNode) ExecuteManeuverByName(maneuverName string) ([]string, error) {
@@ -452,6 +505,56 @@ func mergeVariablesByName(parentVariables []string, localVariables []string) ([]
 	}
 
 	return resultEntries, nil
+}
+
+func mergeEnvironmentDefinitionsByName(
+	baseEnvironments []EnvironmentDefinition,
+	overrideEnvironments []EnvironmentDefinition,
+) ([]EnvironmentDefinition, error) {
+	merged := make([]EnvironmentDefinition, 0, len(baseEnvironments)+len(overrideEnvironments))
+	indexByName := make(map[string]int, len(baseEnvironments))
+
+	for _, baseEnvironment := range baseEnvironments {
+		copied := EnvironmentDefinition{
+			Name:      baseEnvironment.Name,
+			Files:     append([]string(nil), baseEnvironment.Files...),
+			Variables: append([]string(nil), baseEnvironment.Variables...),
+		}
+		merged = append(merged, copied)
+		if copied.Name != "" {
+			indexByName[copied.Name] = len(merged) - 1
+		}
+	}
+
+	for _, overrideEnvironment := range overrideEnvironments {
+		overrideCopy := EnvironmentDefinition{
+			Name:      overrideEnvironment.Name,
+			Files:     append([]string(nil), overrideEnvironment.Files...),
+			Variables: append([]string(nil), overrideEnvironment.Variables...),
+		}
+
+		if overrideCopy.Name != "" {
+			if existingIndex, found := indexByName[overrideCopy.Name]; found {
+				mergedFiles := mergeFileLists(merged[existingIndex].Files, overrideCopy.Files)
+
+				mergedVariables, errorValue := mergeVariablesByName(merged[existingIndex].Variables, overrideCopy.Variables)
+				if errorValue != nil {
+					return nil, errorValue
+				}
+
+				merged[existingIndex].Files = mergedFiles
+				merged[existingIndex].Variables = mergedVariables
+				continue
+			}
+		}
+
+		merged = append(merged, overrideCopy)
+		if overrideCopy.Name != "" {
+			indexByName[overrideCopy.Name] = len(merged) - 1
+		}
+	}
+
+	return merged, nil
 }
 
 func parseVariableEntry(variableEntry string) (string, string, error) {
