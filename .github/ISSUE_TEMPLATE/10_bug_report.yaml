@@ -18,8 +18,7 @@ body:
         - Shell or terminal (PowerShell, Bash, Zsh, CMD, etc.)
         - Go version
         - Relevant external tools such as Git, Docker, or Tilt
-        - How Commodore is being used (standalone CLI, foreman, brigadier, worker, or embedded via SDK)
-      placeholder: "Example: Windows 11, PowerShell 7, Go 1.24, Git 2.49, Docker 28, Tilt 0.34, brigadier CLI"
+      placeholder: "Example: Windows 11, PowerShell 7, Go 1.24, Git 2.49, Docker 28, Tilt 0.34"
     validations:
       required: true
 

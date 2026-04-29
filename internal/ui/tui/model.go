@@ -17,10 +17,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-/*
-Finder is satisfied by any type that can locate a project / module root.
-Both the Foreman's RootFinder and every Brigadier's ModuleFinder satisfy it.
-*/
 type Finder interface {
 	Find() (string, error)
 }
@@ -54,7 +50,7 @@ type tiltExitMsg struct{ err error }
 type tiltDownDoneMsg struct{}
 type tickMsg time.Time
 
-// Model is the BubbleTea model shared by every OctalWeb CLI's up / down command.
+// Model is the BubbleTea model shared by every CLI's up / down command.
 // It shows a spinner during pre-flight checks, then streams Tilt output into a
 // bounded, scrollable viewport with a key-hint bar below it.
 type Model struct {

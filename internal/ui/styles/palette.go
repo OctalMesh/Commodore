@@ -1,7 +1,3 @@
-/*
-Package styles defines the shared color palette for all OctalWeb CLIs.
-Import this package to stay visually consistent across Foreman and Brigadiers.
-*/
 package styles
 
 import "github.com/charmbracelet/lipgloss"

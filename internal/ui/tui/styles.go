@@ -1,6 +1,5 @@
 /*
-Package tui provides the shared BubbleTea TUI widget used by every
-OctalWeb CLI for the `up` and `down` commands.
+Package tui provides the shared BubbleTea TUI widget.
 Styles live here so callers can reference them for post-TUI output.
 */
 package tui
