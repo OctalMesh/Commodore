@@ -1,6 +1,6 @@
 <!--suppress HtmlDeprecatedAttribute, HtmlUnknownTarget -->
 <div align="center">
-  <h2>Commodore Examples</h2>
+  <h1>Commodore Examples</h1>
   <p>Reference configurations and SDK usage for <strong>Commodore</strong></p>
   <h6>
     <a rel="noopener noreferrer" href="../README.md"><- Back to main README</a>
