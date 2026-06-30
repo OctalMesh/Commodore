@@ -8,8 +8,8 @@
   <br />
   <a rel="noopener noreferrer" href="https://github.com/OctalMesh/Commodore">
     <picture>
-      <source media="(prefers-color-scheme: light)" srcset="./.github/assets/svg/commodore.svg">
-      <img alt="Commodore" src="./.github/assets/svg/commodore_white.svg">
+      <source media="(prefers-color-scheme: light)" srcset="./.github/assets/svg/commodore_logo_inside.svg">
+      <img alt="Commodore" src="./.github/assets/svg/commodore_logo_inside_white.svg">
     </picture>
   </a>
   <br /><br /><br />
