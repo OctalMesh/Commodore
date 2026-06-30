@@ -16,17 +16,20 @@ jobs:
     name: "Skip Check"
     runs-on: ubuntu-latest
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      should_skip: ${{ steps.belay.outputs.issued }}
+
     steps:
-      - id: skip_check
-        run: |
-          message="${{ github.event.head_commit.message }}"
-          if [[ "$message" == *"[ci-skip]"* ]] || \
-             [[ "$message" == *"[test-skip]"* ]]; then
-            echo "should_skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "should_skip=false" >> $GITHUB_OUTPUT
-          fi
+      - name: "Setup: Checkout repository"
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: "Run: Check skip tags"
+        id: belay
+        uses: OctalMesh/belay-action@release
+        with:
+          signal_tags: "[ci-skip],[test-skip]"
 
   # Perform Go tests
   test:
