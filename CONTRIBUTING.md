@@ -15,8 +15,6 @@
   </h6>
 </div>
 
-<h1></h1>
-
 Thank you for your interest in **Commodore**!
 
 Commodore is the shared CLI engine and SDK used across OctalMesh projects.
