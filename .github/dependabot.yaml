@@ -1,26 +1,52 @@
+# ============================================================================ #
+#                        Dependabot Configuration File                         #
+# ============================================================================ #
+# This file defines the Dependabot configuration for this project. It keeps    #
+# both go dependencies and GitHub Actions up to date by opening pull requests  #
+# on a weekly schedule, grouped by ecosystem.                                  #
+#                                                                              #
+# See: https://dependabot.com                                                  #
+# ============================================================================ #
+
 version: 2
 
 updates:
   # Keep Go dependencies up to date
   - package-ecosystem: "gomod"
     directory: "/"
+    target-branch: "dev"
+    open-pull-requests-limit: 5
+
+    # Runs every Monday at 6:00 AM UTC
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 5
+      time: "06:00"
+
+    # Reviewers for the pull requests
     reviewers:
       - "OctalMesh/development"
+
+    # Labels for the pull requests
     labels:
       - "Dependencies"
 
   # Keep GitHub Actions up to date
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "dev"
+    open-pull-requests-limit: 5
+
+    # Runs every Monday at 6:00 AM UTC
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 5
+      time: "06:00"
+
+    # Reviewers for the pull requests
     reviewers:
       - "OctalMesh/development"
+
+    # Labels for the pull requests
     labels:
       - "Dependencies"

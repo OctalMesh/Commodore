@@ -1,13 +1,32 @@
+# ============================================================================ #
+#                             CodeQL Configuration                             #
+# ============================================================================ #
+# This file defines the CodeQL analysis configuration for this project. It     #
+# specifies which paths to exclude from analysis, which query suites to run,   #
+# and which rules to suppress to reduce noise.                                 #
+# ============================================================================ #
+
 name: "CodeQL Configuration"
 
 paths-ignore:
+  # Dependencies & build output
+
   - "vendor"
+
+  # Generated files
+
+  - "**/*.pb.go"
+  - "**/*.gen.go"
+
+  # Test files
+
   - "**/testdata/**"
   - "**/*_test.go"
   - "**/test_*.go"
   - "**/mock_*.go"
-  - "**/*.pb.go"
-  - "**/*.gen.go"
+
+  # Config & tooling
+
   - "scripts/**"
   - "go.sum"
   - "go.mod"

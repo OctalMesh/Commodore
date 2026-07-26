@@ -1,3 +1,16 @@
+# ============================================================================ #
+#                                CodeQL Workflow                               #
+# ============================================================================ #
+# Runs GitHub CodeQL security and quality analysis on every push to dev, on    #
+# every pull request targeting dev, and on a weekly schedule.                  #
+#                                                                              #
+# Skip tags (anywhere in commit message or PR title):                          #
+#   [ci-skip] - skips all workflows                                            #
+#   [ql-skip] - skips this workflow only                                       #
+#                                                                              #
+# Note: skip tags are ignored for scheduled runs.                              #
+# ============================================================================ #
+
 name: "CodeQL"
 
 on:
@@ -7,10 +20,8 @@ on:
   pull_request:
     branches: ["dev", "release"]
   schedule:
-    - cron: '41 15 * * 1'
-
-permissions:
-  contents: read
+    # Runs every Monday at 6:00 AM UTC
+    - cron: "0 6 * * 1"
 
 jobs:
   # Check if the commit message contains skip tags
@@ -37,10 +48,11 @@ jobs:
 
   # Perform CodeQL analysis
   analyze:
+    name: "CodeQL Analysis"
     needs: check
     if: needs.check.outputs.should_skip != 'true'
-    name: "CodeQL Analysis"
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     permissions:
       actions: read
@@ -56,40 +68,41 @@ jobs:
             build-mode: "manual"
 
     steps:
-      - name: "Checkout repository"
+      - name: "Setup: Checkout repository"
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: "Set up Go"
+      - name: "Setup: Go"
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
-      - name: "Initialize CodeQL"
+      - name: "Setup: Initialize CodeQL"
         uses: github/codeql-action/init@v4
         with:
           config-file: "./.github/codeql/codeql-config.yaml"
           languages: "${{ matrix.language }}"
           build-mode: "${{ matrix.build-mode }}"
 
-      - name: "Setup proxy for registries"
+      - name: "Setup: Proxy for registries"
         uses: github/codeql-action/start-proxy@v4
 
-      - name: "Configure"
+      - name: "Setup: Configure environment"
         uses: github/codeql-action/resolve-environment@v4
         with:
           language: "${{ matrix.language }}"
 
-      - name: "Build Commodore"
+      - name: "Setup: Build Commodore"
         run: |
           go mod download
           go mod verify
           go build ./...
           go vet ./...
 
-      - name: "Perform CodeQL Analysis"
+      - name: "Run: Perform CodeQL Analysis"
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"

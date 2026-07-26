@@ -1,3 +1,16 @@
+# ============================================================================ #
+#                               Go Lint Workflow                               #
+# ============================================================================ #
+# Runs golangci-lint analysis on every push to dev and on every pull request   #
+# targeting dev that includes changes to the source code.                      #
+#                                                                              #
+# Skip tags (anywhere in commit message or PR title):                          #
+#   [ci-skip]   - skips all workflows                                          #
+#   [lint-skip] - skips this workflow only                                     #
+#                                                                              #
+# Note: skip tags are ignored for scheduled runs.                              #
+# ============================================================================ #
+
 name: "Lint"
 
 on:
@@ -6,9 +19,6 @@ on:
     branches: ["dev", "release"]
   pull_request:
     branches: ["dev", "release"]
-
-permissions:
-  contents: read
 
 jobs:
   # Check if the commit message contains skip tags
@@ -33,24 +43,24 @@ jobs:
 
   # Perform golangci-lint analysis
   lint:
+    name: "GolangCI Lint"
     needs: check
     if: needs.check.outputs.should_skip != 'true'
-    name: "GolangCI Lint"
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    timeout-minutes: 15
 
     steps:
-      - name: "Checkout repository"
+      - name: "Setup: Checkout repository"
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: "Set up Go"
+      - name: "Setup: Go"
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
-      - name: "Run golangci-lint"
+      - name: "Run: GolangCI Lint"
         run: go tool golangci-lint run ./...
